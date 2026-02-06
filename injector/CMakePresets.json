@@ -6,9 +6,11 @@
             "displayName": "Windows Visual Studio 17 2022",
             "generator": "Visual Studio 17 2022",
             "binaryDir": "${sourceDir}/build",
+            "architecture": "Win32",
             "cacheVariables": {
                 "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
-                "CMAKE_BUILD_TYPE": "Debug"
+                "CMAKE_BUILD_TYPE": "Debug",
+                "VCPKG_TARGET_TRIPLET": "x86-windows"
             }
         },
         {
