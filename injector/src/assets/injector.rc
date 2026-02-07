@@ -1,0 +1,4 @@
+#include "resource.hpp"
+
+// 应用程序图标
+IDI_APP_ICON ICON "app.ico"

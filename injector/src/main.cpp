@@ -3,7 +3,8 @@
 #include <iostream>
 #include <string>
 
-#include "injector.h"
+#include "injector.hpp"
+#include "resource.hpp"
 
 using namespace std;
 

@@ -1,4 +1,4 @@
-#include "injector.h"
+#include "injector.hpp"
 
 #if defined(DISABLE_OUTPUT)
 #define i_log(data, ...)
