@@ -2,9 +2,9 @@
 
 namespace InjectedClassLibrary
 {
-    internal class InjectionConfiguration
+    internal class InjectionConfig
     {
-        public InjectionConfiguration(
+        public InjectionConfig(
             string targetAssemblyPath,
             string targetTypeName,
             string targetMethodName,
