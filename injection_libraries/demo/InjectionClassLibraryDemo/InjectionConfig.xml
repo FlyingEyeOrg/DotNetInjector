@@ -1,0 +1,11 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<InjectionConfig xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+                 xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <TargetAssemblyPath>E:\Projects\DotNetInjector\injection_libraries\demo\TargetClassLibrary\bin\Debug\netstandard2.0\TargetClassLibrary.dll</TargetAssemblyPath>
+  <TargetTypeName>TargetClassLibrary.InvocationClass</TargetTypeName>
+  <TargetMethodName>Action</TargetMethodName>
+  <MethodArguments>HelloWorld!</MethodArguments>
+  <DependencyAssemblyPaths>
+    <!-- 如果没有依赖项，可以留空或删除整个 DependencyAssemblyPaths 节点 -->
+  </DependencyAssemblyPaths>
+</InjectionConfig>

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Text.Json;
+using System.Xml.Serialization;
 
 namespace InjectedClassLibrary
 {
@@ -67,7 +67,7 @@ namespace InjectedClassLibrary
                 Logger.Log("Inject operation completed successfully");
                 return 0;
             }
-            catch (Exception ex) when (ex is JsonException or FileNotFoundException or ReflectionTypeLoadException or TargetInvocationException)
+            catch (Exception ex) when (ex is InvalidOperationException or FileNotFoundException or ReflectionTypeLoadException or TargetInvocationException)
             {
                 Logger.Log("Injection failed with expected error type", ex);
                 throw; // 重新抛出特定异常，让上层统一处理
@@ -102,23 +102,75 @@ namespace InjectedClassLibrary
                     throw new InvalidOperationException($"Configuration file is empty: {actualConfigPath}");
                 }
 
-                var options = new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true,
-                    ReadCommentHandling = JsonCommentHandling.Skip
-                };
-
-                var config = JsonSerializer.Deserialize<InjectionConfig>(configContent, options);
+                var config = ParseXmlConfig(configContent);
                 return config ?? throw new InvalidOperationException($"Configuration deserialization returned null for file: {actualConfigPath}");
             }
-            catch (JsonException jsonEx)
+            catch (InvalidOperationException opEx)
             {
-                throw new InvalidOperationException($"Invalid JSON format in configuration file: {actualConfigPath}", jsonEx);
+                throw new InvalidOperationException($"Invalid XML format in configuration file: {actualConfigPath}", opEx);
             }
             catch (UnauthorizedAccessException accessEx)
             {
                 throw new InvalidOperationException($"Access denied reading configuration file: {actualConfigPath}", accessEx);
             }
+        }
+
+        /// <summary>
+        /// 手动解析 XML 配置 - 使用 XmlDocument（最简单的方法）
+        /// </summary>
+        private InjectionConfig ParseXmlConfig(string xmlContent)
+        {
+            try
+            {
+                var config = new InjectionConfig();
+                var doc = new System.Xml.XmlDocument();
+                doc.LoadXml(xmlContent);
+
+                // 解析基本字段
+                var nsManager = new System.Xml.XmlNamespaceManager(doc.NameTable);
+
+                config.TargetAssemblyPath = GetXmlNodeValue(doc, "/InjectionConfig/TargetAssemblyPath");
+                config.TargetTypeName = GetXmlNodeValue(doc, "/InjectionConfig/TargetTypeName");
+                config.TargetMethodName = GetXmlNodeValue(doc, "/InjectionConfig/TargetMethodName");
+                config.MethodArguments = GetXmlNodeValue(doc, "/InjectionConfig/MethodArguments");
+
+                // 解析依赖程序集路径
+                var dependencyNodes = doc.SelectNodes("/InjectionConfig/DependencyAssemblyPaths/Path");
+                if (dependencyNodes != null)
+                {
+                    foreach (System.Xml.XmlNode node in dependencyNodes)
+                    {
+                        string path = node.InnerText.Trim();
+                        if (!string.IsNullOrWhiteSpace(path))
+                        {
+                            config.DependencyAssemblyPaths.Add(path);
+                        }
+                    }
+                }
+
+                // 验证必需字段
+                if (string.IsNullOrWhiteSpace(config.TargetAssemblyPath))
+                    throw new InvalidOperationException("TargetAssemblyPath is required");
+                if (string.IsNullOrWhiteSpace(config.TargetTypeName))
+                    throw new InvalidOperationException("TargetTypeName is required");
+                if (string.IsNullOrWhiteSpace(config.TargetMethodName))
+                    throw new InvalidOperationException("TargetMethodName is required");
+
+                return config;
+            }
+            catch (System.Xml.XmlException xmlEx)
+            {
+                throw new InvalidOperationException($"XML parsing error: {xmlEx.Message}", xmlEx);
+            }
+        }
+
+        /// <summary>
+        /// 安全地获取 XML 节点值
+        /// </summary>
+        private string GetXmlNodeValue(System.Xml.XmlDocument doc, string xpath)
+        {
+            var node = doc.SelectSingleNode(xpath);
+            return node?.InnerText.Trim() ?? string.Empty;
         }
 
         /// <summary>
@@ -139,7 +191,7 @@ namespace InjectedClassLibrary
         private static string GetDefaultConfigPath()
         {
             var assemblyDir = GetAssemblyDirectory();
-            return Path.Combine(assemblyDir, "InjectionConfig.json");
+            return Path.Combine(assemblyDir, "InjectionConfig.xml"); // 改为 .xml 扩展名
         }
 
         /// <summary>

@@ -1,8 +1,0 @@
-﻿{
-  "TargetAssemblyPath": "E:\\Projects\\DotNetInjector\\injection_libraries\\demo\\TargetClassLibrary\\bin\\Debug\\netstandard2.0\\TargetClassLibrary.dll",
-  "TargetTypeName": "TargetClassLibrary.InvocationClass",
-  "TargetMethodName": "Action",
-  "MethodArguments": "HelloWorld!",
-  "DependencyAssemblyPaths": [
-  ]
-}
