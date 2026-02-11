@@ -4,7 +4,7 @@ using System.Text;
 
 namespace InjectedClassLibrary
 {
-    public static class Logger
+    internal static class Logger
     {
         private const string LibraryID = "1665a62f-1f65-4857-b720-6f9216ae5054";
         private static readonly string LogFile;

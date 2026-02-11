@@ -16,20 +16,11 @@ namespace InjectedClassLibrary
         /// </summary>
         public static int Inject(string args)
         {
-            InjectionInterface injector;
-
+            InjectionInterface? injector = null;
             try
             {
                 // 不要在 using 中使用，否则会立即释放资源
                 injector = new InjectionInterface();
-            }
-            catch (Exception)
-            {
-                return -1;
-            }
-
-            try
-            {
                 return injector.InjectInternal(args);
             }
             catch (Exception ex)
@@ -41,7 +32,7 @@ namespace InjectedClassLibrary
             finally
             {
                 // 手动释放资源
-                injector.Dispose();
+                injector?.Dispose();
             }
         }
 
