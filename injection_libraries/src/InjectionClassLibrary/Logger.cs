@@ -12,8 +12,11 @@ namespace InjectedClassLibrary
 
         static Logger()
         {
+#if NET45 || NET451 || NET452
+            string logDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"InjectionLogs[{LibraryID}]");
+#else
             string logDir = Path.Combine(AppContext.BaseDirectory, $"InjectionLogs[{LibraryID}]");
-
+#endif
             // 确保目录存在
             Directory.CreateDirectory(logDir);
 

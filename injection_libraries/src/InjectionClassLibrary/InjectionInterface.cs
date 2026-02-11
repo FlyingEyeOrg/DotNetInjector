@@ -230,6 +230,21 @@ namespace InjectedClassLibrary
         }
 
         /// <summary>
+        /// 用于记录加载失败的依赖程序集信息（.NET 4.5.1 兼容性）
+        /// </summary>
+        private class FailedLoadInfo
+        {
+            public string Path { get; set; }
+            public Exception Error { get; set; }
+          
+            public FailedLoadInfo(string path, Exception error)
+            {
+                Path = path;
+                Error = error;
+            }
+        }
+
+        /// <summary>
         /// 加载依赖程序集
         /// </summary>
         private void LoadDependencyAssemblies(List<string>? dependencyPaths)
@@ -240,10 +255,10 @@ namespace InjectedClassLibrary
                 return;
             }
 
-            Logger.Log($"Loading {dependencyPaths.Count} dependency assemblies");
+            Logger.Log(string.Format("Loading {0} dependency assemblies", dependencyPaths.Count));
 
             var successfulLoads = new List<string>();
-            var failedLoads = new List<(string Path, Exception Error)>();
+            var failedLoads = new List<FailedLoadInfo>();
 
             foreach (var path in dependencyPaths.Where(p => !string.IsNullOrWhiteSpace(p)))
             {
@@ -252,23 +267,23 @@ namespace InjectedClassLibrary
                     var resolvedPath = ResolveConfigPath(path);
                     Assembly.LoadFrom(resolvedPath);
                     successfulLoads.Add(resolvedPath);
-                    Logger.Log($"Successfully loaded dependency: {resolvedPath}");
+                    Logger.Log(string.Format("Successfully loaded dependency: {0}", resolvedPath));
                 }
                 catch (Exception ex)
                 {
-                    failedLoads.Add((path, ex));
-                    Logger.Log($"Failed to load dependency assembly: {path}", ex);
+                    failedLoads.Add(new FailedLoadInfo(path, ex));
+                    Logger.Log(string.Format("Failed to load dependency assembly: {0}", path), ex);
                 }
             }
 
             // 如果有任何依赖加载失败，抛出异常
             if (failedLoads.Count > 0)
             {
-                var errors = string.Join("; ", failedLoads.Select(f => $"{f.Path}: {f.Error.Message}"));
-                throw new InvalidOperationException($"Failed to load {failedLoads.Count} dependency assemblies: {errors}");
+                var errors = string.Join("; ", failedLoads.Select(f => string.Format("{0}: {1}", f.Path, f.Error.Message)));
+                throw new InvalidOperationException(string.Format("Failed to load {0} dependency assemblies: {1}", failedLoads.Count, errors));
             }
 
-            Logger.Log($"All {successfulLoads.Count} dependency assemblies loaded successfully");
+            Logger.Log(string.Format("All {0} dependency assemblies loaded successfully", successfulLoads.Count));
         }
 
         /// <summary>
