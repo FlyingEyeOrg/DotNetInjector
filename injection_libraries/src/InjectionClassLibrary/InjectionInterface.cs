@@ -272,7 +272,7 @@ namespace InjectedClassLibrary
         }
 
         /// <summary>
-        /// 执行目标方法
+        /// 执行目标方法 - 仅支持 public static void Method(string) 签名
         /// </summary>
         private void ExecuteTargetMethod(InjectionConfig config)
         {
@@ -287,13 +287,19 @@ namespace InjectedClassLibrary
 
             Logger.Log($"Target type found: {type.FullName}");
 
-            var method = type.GetMethod(config.TargetMethodName)
-                ?? throw new InvalidOperationException($"Target method '{config.TargetMethodName}' not found in type '{config.TargetTypeName}'");
+            // 查找 public static void Action(string) 方法
+            var method = type.GetMethod(config.TargetMethodName,
+                                        BindingFlags.Public | BindingFlags.Static)
+                ?? throw new InvalidOperationException($"Public static method '{config.TargetMethodName}' not found in type '{config.TargetTypeName}'");
 
-            Logger.Log($"Target method found: {method.Name}");
+            var parameters = method.GetParameters();
+            if (parameters.Length != 1 || parameters[0].ParameterType != typeof(string))
+                throw new InvalidOperationException($"Method '{config.TargetMethodName}' must have exactly one string parameter");
+
+            Logger.Log($"Target method signature verified: public static void {method.Name}(string)");
 
             // 调用目标方法
-            Logger.Log($"Invoking {config.TargetTypeName}.{config.TargetMethodName}");
+            Logger.Log($"Invoking {config.TargetTypeName}.{config.TargetMethodName} with argument: '{config.MethodArguments}'");
             try
             {
                 method.Invoke(null, [config.MethodArguments]);
@@ -302,7 +308,7 @@ namespace InjectedClassLibrary
             catch (TargetInvocationException invokeEx)
             {
                 Logger.Log($"Target method execution failed: {invokeEx.InnerException?.Message}", invokeEx);
-                throw; // 保留原始堆栈信息
+                throw;
             }
         }
 
