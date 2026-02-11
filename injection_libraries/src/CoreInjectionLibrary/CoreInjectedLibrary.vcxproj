@@ -24,6 +24,7 @@
     <ProjectGuid>{b08fa5c1-b8f6-4ff9-aea6-009ee1afb799}</ProjectGuid>
     <RootNamespace>CoreInjectedLibrary</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>CoreInjectionLibrary</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
