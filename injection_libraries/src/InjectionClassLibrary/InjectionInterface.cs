@@ -18,19 +18,19 @@ namespace InjectedClassLibrary
 
         /// <summary>
         /// 静态注入方法 - 单次使用工具，自动资源管理
+        /// 始终使用默认配置文件路径
         /// </summary>
-        /// <param name="configFile">可选的配置文件路径，为空则使用默认路径</param>
         /// <returns>执行结果：0=成功，负数=失败</returns>
-        public static int Inject(string? configFile = null)
+        public static int Inject(string? _ = null)
         {
-            Logger.Log($"Static Inject method called with configFile: '{configFile ?? "null (using default)"}'");
+            Logger.Log("Static Inject method called - using default configuration");
 
             // 使用 using 语句确保资源正确释放，但通过配置延迟清理时机
             using var injector = new InjectionInterface();
 
             try
             {
-                return injector.ExecuteInjection(configFile);
+                return injector.ExecuteInjection();
             }
             catch (Exception ex)
             {
@@ -40,9 +40,9 @@ namespace InjectedClassLibrary
         }
 
         /// <summary>
-        /// 执行注入的核心方法
+        /// 执行注入的核心方法 - 使用默认配置
         /// </summary>
-        private int ExecuteInjection(string? configFile)
+        private int ExecuteInjection()
         {
             if (_disposed)
                 throw new ObjectDisposedException(nameof(InjectionInterface));
@@ -51,8 +51,8 @@ namespace InjectedClassLibrary
 
             try
             {
-                // 获取配置（智能选择：参数优先，无参数则用默认）
-                var config = GetConfiguration(configFile);
+                // 获取配置（始终使用默认路径）
+                var config = GetConfiguration();
                 Logger.Log($"Using configuration - Assembly: {config.TargetAssemblyPath}, Type: {config.TargetTypeName}, Method: {config.TargetMethodName}");
 
                 // 验证配置
@@ -80,14 +80,12 @@ namespace InjectedClassLibrary
         }
 
         /// <summary>
-        /// 智能获取配置：优先使用参数，参数为空时使用默认路径
+        /// 获取默认配置（始终使用默认路径）
         /// </summary>
-        private InjectionConfig GetConfiguration(string? configFile)
+        private InjectionConfig GetConfiguration()
         {
-            // 策略：参数配置 > 默认路径配置
-            string actualConfigPath = !string.IsNullOrWhiteSpace(configFile)
-                ? ResolveConfigPath(configFile)
-                : DefaultConfigPath.Value;
+            // 策略：始终使用默认路径配置
+            string actualConfigPath = DefaultConfigPath.Value;
 
             Logger.Log($"Loading configuration from: {actualConfigPath}");
 

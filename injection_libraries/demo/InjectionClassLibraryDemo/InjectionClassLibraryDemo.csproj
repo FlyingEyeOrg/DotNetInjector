@@ -11,4 +11,10 @@
     <ProjectReference Include="..\..\src\InjectionClassLibrary\InjectionClassLibrary.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="InjectionConfig.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

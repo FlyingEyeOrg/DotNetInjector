@@ -6,7 +6,7 @@ namespace InjectionClassLibraryDemo
     {
         static void Main(string[] args)
         {
-            InjectionInterface.Inject("hello");
+            InjectionInterface.Inject();
         }
     }
 }
