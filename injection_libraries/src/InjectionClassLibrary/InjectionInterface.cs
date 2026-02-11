@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Text.Json;
 
@@ -7,168 +9,172 @@ namespace InjectedClassLibrary
 {
     /// <summary>
     /// 注入接口类 - 提供动态程序集加载和方法调用功能
-    /// 设计为单次使用的工具类，使用后自动清理资源
+    /// 优化版本：简化生命周期管理，增强配置灵活性
     /// </summary>
-    public class InjectionInterface : IDisposable
+    public sealed class InjectionInterface : IDisposable
     {
         private bool _disposed = false;
+        private static readonly Lazy<string> DefaultConfigPath = new Lazy<string>(GetDefaultConfigPath);
 
         /// <summary>
-        /// 私有构造函数，强制使用静态方法进行实例化
-        /// 确保资源管理的统一性和正确性
+        /// 静态注入方法 - 单次使用工具，自动资源管理
         /// </summary>
-        private InjectionInterface()
-        {
-            Logger.Log("InjectionInterface instance created");
-        }
-
-        /// <summary>
-        /// 静态注入方法 - 适合一次性调用的场景
-        /// 自动管理对象生命周期，无需手动释放资源
-        /// </summary>
-        /// <param name="args">注入参数（当前未使用，保留扩展）</param>
+        /// <param name="configFile">可选的配置文件路径，为空则使用默认路径</param>
         /// <returns>执行结果：0=成功，负数=失败</returns>
-        public static int Inject(string args)
+        public static int Inject(string? configFile = null)
         {
-            Logger.Log($"Static Inject method called with args: '{args}'");
+            Logger.Log($"Static Inject method called with configFile: '{configFile ?? "null (using default)"}'");
 
-            InjectionInterface? injector = null;
+            // 使用 using 语句确保资源正确释放，但通过配置延迟清理时机
+            using var injector = new InjectionInterface();
+
             try
             {
-                // 创建实例但不使用using，避免立即释放
-                injector = new InjectionInterface();
-                Logger.Log("InjectionInterface instance initialized successfully");
-
-                return injector.InjectInternal(args);
+                return injector.ExecuteInjection(configFile);
             }
             catch (Exception ex)
             {
-                // 记录详细的错误信息
-                Logger.Log($"Inject operation failed - Args: '{args}'", ex);
+                Logger.Log($"Inject operation failed", ex);
                 return -1;
-            }
-            finally
-            {
-                // 手动释放资源，确保即使出现异常也能正确清理
-                if (injector != null)
-                {
-                    try
-                    {
-                        injector.Dispose();
-                        Logger.Log("InjectionInterface instance disposed successfully");
-                    }
-                    catch (Exception disposeEx)
-                    {
-                        Logger.Log("Failed to dispose InjectionInterface instance", disposeEx);
-                    }
-                }
             }
         }
 
         /// <summary>
-        /// 内部注入实现方法 - 核心业务逻辑
+        /// 执行注入的核心方法
         /// </summary>
-        /// <param name="args">注入参数</param>
-        /// <returns>执行状态码</returns>
-        private int InjectInternal(string args)
+        private int ExecuteInjection(string? configFile)
         {
-            Logger.Log("Starting internal injection process");
-
-            // 检查对象状态，防止重复调用导致的状态不一致
             if (_disposed)
-            {
-                string errorMsg = "Cannot execute InjectInternal on disposed InjectionInterface instance";
-                Logger.Log(errorMsg);
-                throw new ObjectDisposedException(nameof(InjectionInterface), errorMsg);
-            }
+                throw new ObjectDisposedException(nameof(InjectionInterface));
+
+            Logger.Log("Starting injection process");
 
             try
             {
-                Logger.Log($"Processing injection with arguments: {args ?? "null"}");
-                Logger.Log($"Application base directory: {AppContext.BaseDirectory}");
-                Logger.Log($"Current assembly location: {typeof(InjectionInterface).Assembly.Location}");
+                // 获取配置（智能选择：参数优先，无参数则用默认）
+                var config = GetConfiguration(configFile);
+                Logger.Log($"Using configuration - Assembly: {config.TargetAssemblyPath}, Type: {config.TargetTypeName}, Method: {config.TargetMethodName}");
 
-                // 获取并验证配置
-                var config = GetConfiguration();
+                // 验证配置
                 ValidateConfiguration(config);
 
-                // 优先加载依赖的程序集
-                LoadDependencyAssemblies(config.DependencyAssemblyPaths.ToArray());
+                // 加载依赖
+                LoadDependencyAssemblies(config.DependencyAssemblyPaths);
 
-                // 加载目标程序集并执行方法
+                // 执行目标方法
                 ExecuteTargetMethod(config);
 
                 Logger.Log("Inject operation completed successfully");
                 return 0;
             }
-            catch (JsonException jsonEx)
+            catch (Exception ex) when (ex is JsonException or FileNotFoundException or ReflectionTypeLoadException or TargetInvocationException)
             {
-                string errorMsg = $"Configuration file parsing failed - invalid JSON format";
-                Logger.Log(errorMsg, jsonEx);
-                throw new InvalidOperationException(errorMsg, jsonEx);
-            }
-            catch (FileNotFoundException fileEx)
-            {
-                string errorMsg = $"Required file not found during injection process";
-                Logger.Log(errorMsg, fileEx);
-                throw new InvalidOperationException(errorMsg, fileEx);
-            }
-            catch (ReflectionTypeLoadException loadEx)
-            {
-                string errorMsg = $"Type loading failed during assembly reflection";
-                Logger.Log($"{errorMsg} - Loader exceptions count: {loadEx.LoaderExceptions?.Length ?? 0}", loadEx);
-
-                // 记录所有加载异常
-                if (loadEx.LoaderExceptions != null)
-                {
-                    for (int i = 0; i < loadEx.LoaderExceptions.Length; i++)
-                    {
-                        var tmpEx = loadEx.LoaderExceptions[i];
-                        if (tmpEx != null)
-                            Logger.Log($"Loader exception {i + 1}", tmpEx);
-                    }
-                }
-                throw new InvalidOperationException(errorMsg, loadEx);
-            }
-            catch (TargetInvocationException invokeEx)
-            {
-                string errorMsg = $"Target method invocation failed";
-                Logger.Log(errorMsg, invokeEx);
-                throw new InvalidOperationException($"{errorMsg} - Inner exception: {invokeEx.InnerException?.Message}", invokeEx);
+                Logger.Log("Injection failed with expected error type", ex);
+                throw; // 重新抛出特定异常，让上层统一处理
             }
             catch (Exception ex)
             {
-                string errorMsg = $"Unexpected error during injection process";
-                Logger.Log(errorMsg, ex);
-                throw new InvalidOperationException(errorMsg, ex);
+                Logger.Log("Injection failed with unexpected error", ex);
+                throw new InvalidOperationException("Unexpected error during injection process", ex);
             }
+        }
+
+        /// <summary>
+        /// 智能获取配置：优先使用参数，参数为空时使用默认路径
+        /// </summary>
+        private InjectionConfig GetConfiguration(string? configFile)
+        {
+            // 策略：参数配置 > 默认路径配置
+            string actualConfigPath = !string.IsNullOrWhiteSpace(configFile)
+                ? ResolveConfigPath(configFile)
+                : DefaultConfigPath.Value;
+
+            Logger.Log($"Loading configuration from: {actualConfigPath}");
+
+            if (!File.Exists(actualConfigPath))
+            {
+                throw new FileNotFoundException($"Configuration file not found: {actualConfigPath}");
+            }
+
+            try
+            {
+                string configContent = File.ReadAllText(actualConfigPath);
+                if (string.IsNullOrWhiteSpace(configContent))
+                {
+                    throw new InvalidOperationException($"Configuration file is empty: {actualConfigPath}");
+                }
+
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    ReadCommentHandling = JsonCommentHandling.Skip
+                };
+
+                var config = JsonSerializer.Deserialize<InjectionConfig>(configContent, options);
+                return config ?? throw new InvalidOperationException($"Configuration deserialization returned null for file: {actualConfigPath}");
+            }
+            catch (JsonException jsonEx)
+            {
+                throw new InvalidOperationException($"Invalid JSON format in configuration file: {actualConfigPath}", jsonEx);
+            }
+            catch (UnauthorizedAccessException accessEx)
+            {
+                throw new InvalidOperationException($"Access denied reading configuration file: {actualConfigPath}", accessEx);
+            }
+        }
+
+        /// <summary>
+        /// 解析配置文件路径（支持相对路径和绝对路径）
+        /// </summary>
+        private static string ResolveConfigPath(string configFile)
+        {
+            if (Path.IsPathRooted(configFile))
+                return configFile;
+
+            var assemblyDir = GetAssemblyDirectory();
+            return Path.GetFullPath(Path.Combine(assemblyDir, configFile));
+        }
+
+        /// <summary>
+        /// 获取默认配置文件路径
+        /// </summary>
+        private static string GetDefaultConfigPath()
+        {
+            var assemblyDir = GetAssemblyDirectory();
+            return Path.Combine(assemblyDir, "InjectionConfig.json");
+        }
+
+        /// <summary>
+        /// 获取程序集所在目录
+        /// </summary>
+        private static string GetAssemblyDirectory()
+        {
+            var assemblyLocation = typeof(InjectionInterface).Assembly.Location;
+            if (string.IsNullOrEmpty(assemblyLocation))
+            {
+                throw new InvalidOperationException("Unable to determine assembly location");
+            }
+
+            var assemblyDir = Path.GetDirectoryName(assemblyLocation);
+            return assemblyDir ?? throw new InvalidOperationException($"Unable to determine directory for assembly: {assemblyLocation}");
         }
 
         /// <summary>
         /// 验证配置的完整性和有效性
         /// </summary>
-        /// <param name="config">配置对象</param>
-        private void ValidateConfiguration(InjectionConfig config)
+        private static void ValidateConfiguration(InjectionConfig config)
         {
             if (config == null)
-            {
-                throw new ArgumentNullException(nameof(config), "Configuration cannot be null");
-            }
+                throw new ArgumentNullException(nameof(config));
 
             if (string.IsNullOrWhiteSpace(config.TargetAssemblyPath))
-            {
                 throw new InvalidOperationException("TargetAssemblyPath is required in configuration");
-            }
 
             if (string.IsNullOrWhiteSpace(config.TargetTypeName))
-            {
                 throw new InvalidOperationException("TargetTypeName is required in configuration");
-            }
 
             if (string.IsNullOrWhiteSpace(config.TargetMethodName))
-            {
                 throw new InvalidOperationException("TargetMethodName is required in configuration");
-            }
 
             Logger.Log("Configuration validation passed");
         }
@@ -176,135 +182,77 @@ namespace InjectedClassLibrary
         /// <summary>
         /// 加载依赖程序集
         /// </summary>
-        /// <param name="dependencyPaths">依赖程序集路径列表</param>
-        private void LoadDependencyAssemblies(string[] dependencyPaths)
+        private void LoadDependencyAssemblies(List<string>? dependencyPaths)
         {
-            if (dependencyPaths == null || dependencyPaths.Length == 0)
+            if (dependencyPaths == null || dependencyPaths.Count == 0)
             {
                 Logger.Log("No dependency assemblies to load");
                 return;
             }
 
-            Logger.Log($"Loading {dependencyPaths.Length} dependency assemblies");
+            Logger.Log($"Loading {dependencyPaths.Count} dependency assemblies");
 
-            foreach (var path in dependencyPaths)
+            var successfulLoads = new List<string>();
+            var failedLoads = new List<(string Path, Exception Error)>();
+
+            foreach (var path in dependencyPaths.Where(p => !string.IsNullOrWhiteSpace(p)))
             {
                 try
                 {
-                    if (string.IsNullOrWhiteSpace(path))
-                    {
-                        Logger.Log("Warning: Empty dependency path encountered, skipping");
-                        continue;
-                    }
-
-                    Logger.Log($"Loading dependency assembly from: {path}");
-                    Assembly.LoadFrom(path);
-                    Logger.Log($"Successfully loaded dependency: {path}");
+                    var resolvedPath = ResolveConfigPath(path);
+                    Assembly.LoadFrom(resolvedPath);
+                    successfulLoads.Add(resolvedPath);
+                    Logger.Log($"Successfully loaded dependency: {resolvedPath}");
                 }
                 catch (Exception ex)
                 {
-                    string errorMsg = $"Failed to load dependency assembly: {path}";
-                    Logger.Log(errorMsg, ex);
-                    throw new InvalidOperationException(errorMsg, ex);
+                    failedLoads.Add((path, ex));
+                    Logger.Log($"Failed to load dependency assembly: {path}", ex);
                 }
             }
+
+            // 如果有任何依赖加载失败，抛出异常
+            if (failedLoads.Count > 0)
+            {
+                var errors = string.Join("; ", failedLoads.Select(f => $"{f.Path}: {f.Error.Message}"));
+                throw new InvalidOperationException($"Failed to load {failedLoads.Count} dependency assemblies: {errors}");
+            }
+
+            Logger.Log($"All {successfulLoads.Count} dependency assemblies loaded successfully");
         }
 
         /// <summary>
         /// 执行目标方法
         /// </summary>
-        /// <param name="config">配置信息</param>
         private void ExecuteTargetMethod(InjectionConfig config)
         {
             Logger.Log($"Loading target assembly: {config.TargetAssemblyPath}");
 
-            // 加载目标程序集
-            var assembly = Assembly.LoadFrom(config.TargetAssemblyPath);
-            Logger.Log($"Target assembly loaded successfully: {assembly.FullName}");
+            var assemblyPath = ResolveConfigPath(config.TargetAssemblyPath);
+            var assembly = Assembly.LoadFrom(assemblyPath);
+            Logger.Log($"Target assembly loaded: {assembly.FullName}");
 
-            // 获取目标类型
-            var type = assembly.GetType(config.TargetTypeName);
-            if (type == null)
-            {
-                throw new InvalidOperationException($"Target type '{config.TargetTypeName}' not found in assembly '{config.TargetAssemblyPath}'");
-            }
+            var type = assembly.GetType(config.TargetTypeName)
+                ?? throw new InvalidOperationException($"Target type '{config.TargetTypeName}' not found in assembly '{assemblyPath}'");
+
             Logger.Log($"Target type found: {type.FullName}");
 
-            // 获取目标方法
-            var method = type.GetMethod(config.TargetMethodName);
-            if (method == null)
-            {
-                throw new InvalidOperationException($"Target method '{config.TargetMethodName}' not found in type '{config.TargetTypeName}'");
-            }
+            var method = type.GetMethod(config.TargetMethodName)
+                ?? throw new InvalidOperationException($"Target method '{config.TargetMethodName}' not found in type '{config.TargetTypeName}'");
+
             Logger.Log($"Target method found: {method.Name}");
 
             // 调用目标方法
-            Logger.Log($"Invoking target method: {config.TargetTypeName}.{config.TargetMethodName}");
+            Logger.Log($"Invoking {config.TargetTypeName}.{config.TargetMethodName}");
             try
             {
-                method.Invoke(null, null);
+                method.Invoke(null, [config.MethodArguments]);
                 Logger.Log("Target method executed successfully");
             }
-            catch (Exception ex)
+            catch (TargetInvocationException invokeEx)
             {
-                string errorMsg = $"Target method execution failed: {config.TargetTypeName}.{config.TargetMethodName}";
-                Logger.Log(errorMsg, ex);
-                throw; // 重新抛出以让上层处理
-            }
-        }
-
-        /// <summary>
-        /// 从配置文件获取注入配置
-        /// </summary>
-        /// <returns>配置对象</returns>
-        private InjectionConfig GetConfiguration()
-        {
-            Logger.Log("Reading injection configuration");
-
-            var assemblyLocation = typeof(InjectionInterface).Assembly.Location;
-            if (string.IsNullOrEmpty(assemblyLocation))
-            {
-                throw new InvalidOperationException("Unable to determine assembly location for configuration file lookup");
-            }
-
-            var assemblyDir = Path.GetDirectoryName(assemblyLocation);
-            if (string.IsNullOrEmpty(assemblyDir))
-            {
-                throw new InvalidOperationException($"Unable to determine directory for assembly location: {assemblyLocation}");
-            }
-
-            var configFile = Path.Combine(assemblyDir, "InjectionConfig.json");
-            Logger.Log($"Looking for configuration file at: {configFile}");
-
-            if (!File.Exists(configFile))
-            {
-                throw new FileNotFoundException($"Configuration file not found: {configFile}");
-            }
-
-            try
-            {
-                string configContent = File.ReadAllText(configFile);
-                if (string.IsNullOrWhiteSpace(configContent))
-                {
-                    throw new InvalidOperationException($"Configuration file is empty: {configFile}");
-                }
-
-                var config = JsonSerializer.Deserialize<InjectionConfig>(configContent);
-                if (config == null)
-                {
-                    throw new InvalidOperationException($"Configuration deserialization returned null for file: {configFile}");
-                }
-
-                Logger.Log("Configuration loaded and parsed successfully");
-                return config;
-            }
-            catch (JsonException jsonEx)
-            {
-                throw new InvalidOperationException($"Invalid JSON format in configuration file: {configFile}", jsonEx);
-            }
-            catch (UnauthorizedAccessException accessEx)
-            {
-                throw new InvalidOperationException($"Access denied reading configuration file: {configFile}", accessEx);
+                Logger.Log($"Target method execution failed: {invokeEx.InnerException?.Message}", invokeEx);
+                throw; // 保留原始堆栈信息
             }
         }
 
@@ -317,9 +265,13 @@ namespace InjectedClassLibrary
             {
                 Logger.Log("Disposing InjectionInterface resources");
                 _disposed = true;
-                // 这里可以添加其他需要清理的资源
                 GC.SuppressFinalize(this);
             }
         }
+
+        /// <summary>
+        /// 析构函数作为安全网
+        /// </summary>
+        ~InjectionInterface() => Dispose();
     }
 }

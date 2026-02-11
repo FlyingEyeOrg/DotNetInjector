@@ -5,17 +5,17 @@ namespace InjectedClassLibrary
     internal class InjectionConfig
     {
         public InjectionConfig(
+            List<string> dependencyAssemblyPaths,
             string targetAssemblyPath,
             string targetTypeName,
             string targetMethodName,
-            string methodArguments,
-            List<string> dependencyAssemblyPaths)
+            string? methodArguments = null)
         {
+            DependencyAssemblyPaths = dependencyAssemblyPaths;
             TargetAssemblyPath = targetAssemblyPath;
             TargetTypeName = targetTypeName;
             TargetMethodName = targetMethodName;
             MethodArguments = methodArguments;
-            DependencyAssemblyPaths = dependencyAssemblyPaths;
         }
 
         /// <summary>
@@ -36,7 +36,7 @@ namespace InjectedClassLibrary
         /// <summary>
         /// 传递给目标方法的参数字符串
         /// </summary>
-        public string MethodArguments { get; set; }
+        public string? MethodArguments { get; set; }
 
         /// <summary>
         /// 需要预先加载的依赖程序集路径列表
