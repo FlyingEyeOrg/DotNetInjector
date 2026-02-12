@@ -1,4 +1,5 @@
 ﻿using InjectedClassLibrary;
+using System.Diagnostics;
 
 namespace InjectionClassLibraryDemo
 {
@@ -6,7 +7,9 @@ namespace InjectionClassLibraryDemo
     {
         static void Main(string[] args)
         {
+            Console.WriteLine(Process.GetCurrentProcess().Id);
             InjectionInterface.Inject();
+            Console.ReadLine();
         }
     }
 }
