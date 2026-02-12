@@ -19,6 +19,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MonoInjectionLibrary", "src
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FrameworkInjectionLibrary", "src\FrameworkInjectionLibrary\FrameworkInjectionLibrary.vcxproj", "{01E69BC1-950D-41DA-8A5C-9501E9D8DB02}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SharedInjectionLibrary", "src\SharedInjectionLibrary\SharedInjectionLibrary.vcxitems", "{E2723C73-2A38-4CAE-85EA-CAC072335890}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -112,8 +114,13 @@ Global
 		{7DFC7480-8A67-45A2-BE64-E8A789769286} = {7CA14CC5-6145-44D9-BB09-D9AAFE2E5C34}
 		{FBD757DB-B56F-4D3A-86E7-EAB60E70A97B} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 		{01E69BC1-950D-41DA-8A5C-9501E9D8DB02} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
+		{E2723C73-2A38-4CAE-85EA-CAC072335890} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {5F946ECA-CACC-4FAE-A053-6CA9C375EDCE}
+	EndGlobalSection
+	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		src\SharedInjectionLibrary\SharedInjectionLibrary.vcxitems*{01e69bc1-950d-41da-8a5c-9501e9d8db02}*SharedItemsImports = 4
+		src\SharedInjectionLibrary\SharedInjectionLibrary.vcxitems*{e2723c73-2a38-4cae-85ea-cac072335890}*SharedItemsImports = 9
 	EndGlobalSection
 EndGlobal
