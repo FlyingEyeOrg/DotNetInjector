@@ -6,8 +6,9 @@
 
 int main()
 {
-	//Logger::Log("");
-	B b;
-	//b.accessA()
+	std::cout << "hello" << std::endl;
+	Logger::Initialize();
+	Logger::Log("Hello");
+	std::cout << "hello" << std::endl;
 }
 
