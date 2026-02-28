@@ -3,6 +3,7 @@
 #include <iomanip>
 #include <sstream>
 #include <windows.h>
+#include "pch.h"
 
 std::wstring Logger::s_LogDir;
 std::wstring Logger::s_LogFile;
