@@ -20,7 +20,7 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="$(MSBuildThisFileDirectory)Logger.cpp">
+    <ClCompile Include="$(MSBuildThisFileDirectory)Logger1.cpp">
       <Filter>srouce</Filter>
     </ClCompile>
   </ItemGroup>
