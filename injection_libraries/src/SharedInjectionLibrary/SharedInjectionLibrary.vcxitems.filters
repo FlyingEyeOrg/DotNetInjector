@@ -18,6 +18,9 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)framework.h">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="$(MSBuildThisFileDirectory)shared_memory.h">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="$(MSBuildThisFileDirectory)logger.cpp">
