@@ -9,7 +9,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="$(MSBuildThisFileDirectory)Logger.h">
+    <ClInclude Include="$(MSBuildThisFileDirectory)Logger1.h">
       <Filter>include</Filter>
     </ClInclude>
     <ClInclude Include="$(MSBuildThisFileDirectory)pch.h">
@@ -20,7 +20,7 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="$(MSBuildThisFileDirectory)Logger1.cpp">
+    <ClCompile Include="$(MSBuildThisFileDirectory)logger.cpp">
       <Filter>srouce</Filter>
     </ClCompile>
   </ItemGroup>
