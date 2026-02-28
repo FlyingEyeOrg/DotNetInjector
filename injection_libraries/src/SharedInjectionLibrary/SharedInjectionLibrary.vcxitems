@@ -15,7 +15,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(MSBuildThisFileDirectory)framework.h" />
-    <ClInclude Include="$(MSBuildThisFileDirectory)Logger1.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)logger.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)pch.h" />
   </ItemGroup>
   <ItemGroup>
