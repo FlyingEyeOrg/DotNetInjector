@@ -1,5 +1,7 @@
 #pragma once
-#define UNICODE
+
+/* include default defines */
+#include "defines.hpp"
 
 /* include windows header */
 #include <Windows.h>
