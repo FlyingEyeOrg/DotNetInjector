@@ -41,9 +41,19 @@
             "configuration": "Release"
         },
         {
+            "name": "x64-windows-debug",
+            "configurePreset": "x64-windows",
+            "configuration": "Debug"
+        },
+        {
             "name": "x86-windows-release",
             "configurePreset": "x86-windows",
             "configuration": "Release"
+        },
+        {
+            "name": "x86-windows-debug",
+            "configurePreset": "x86-windows",
+            "configuration": "Debug"
         }
     ]
 }
