@@ -75,4 +75,4 @@ vcpkg_installed
 
 ### vcpkg 相关 gitignore end
 
-.vscode
+.vscode/
