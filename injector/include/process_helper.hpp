@@ -9,4 +9,4 @@
 bool is_correct_target_architecture(HANDLE h_proc);
 
 // 根据进程名称获取进程 id
-DWORD get_process_id_by_name(wchar_t* name);
+DWORD get_process_id_by_name(const wchar_t* name);
