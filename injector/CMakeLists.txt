@@ -10,6 +10,9 @@ file(GLOB_RECURSE CPP_FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 # 打印文件列表（调试用）
 message(STATUS "Found CPP files: ${CPP_FILES}")
 
+# 包含 c++ 命令行参数处理库
+find_package(cxxopts CONFIG REQUIRED)
+
 add_executable(${PROJECT_NAME} ${CPP_FILES})
 
 # 包含所有资源文件
@@ -30,6 +33,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     user32        # 用户界面函数
     gdi32         # 图形设备接口
     kernel32      # 核心系统函数
+    cxxopts::cxxopts # c++ 命令行参数处理库
 )
 
 # 包含头文件目录
