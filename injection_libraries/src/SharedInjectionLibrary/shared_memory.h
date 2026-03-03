@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstring>
 #include <string>
+#include "pch.h"
 
 // 定义 BYTE 为 unsigned char，便于表示字节
 using BYTE = uint8_t;
@@ -21,7 +22,7 @@ private:
     wchar_t m_MutexName[256] = L"";           // 互斥量名称
 
     // 固定的 GUID，所有进程使用同一个
-    static constexpr wchar_t GUID[] = L"a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+    static constexpr wchar_t GUID[] = APP_ID;
 
     // 生成带 GUID 前缀的名称
     static std::wstring MakeUniqueName(const wchar_t* baseName)

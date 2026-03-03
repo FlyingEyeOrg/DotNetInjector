@@ -4,11 +4,12 @@
 #include <mutex>
 #include <chrono>
 #include <filesystem>
+#include "pch.h"
 
 class Logger final
 {
 private:
-    static constexpr const wchar_t* LibraryID = L"1665a62f-1f65-4857-b720-6f9216ae5054";
+    static constexpr const wchar_t* LibraryID = APP_ID;
 
     static std::wstring s_LogDir;
     static std::wstring s_LogFile;
