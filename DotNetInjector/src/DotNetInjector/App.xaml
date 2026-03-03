@@ -1,9 +1,8 @@
 ﻿<Application x:Class="DotNetInjector.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:DotNetInjector"
-             StartupUri="MainWindow.xaml">
+             xmlns:local="clr-namespace:DotNetInjector">
     <Application.Resources>
-         
+
     </Application.Resources>
 </Application>
