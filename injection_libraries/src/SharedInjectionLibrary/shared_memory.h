@@ -124,7 +124,7 @@ public:
         }
 
         // 2. 打开同名互斥量（使用基础名称）
-        swprintf_s(m_MutexName, L"Global\\ProcessInjector_SharedMemory_Mutex_%s", baseName);
+        swprintf_s(m_MutexName, L"Global\\[%s]-ProcessInjector_SharedMemory_Mutex_%s", GUID, baseName);
         m_hMutex = OpenMutexW(
             MUTEX_ALL_ACCESS,
             FALSE,
