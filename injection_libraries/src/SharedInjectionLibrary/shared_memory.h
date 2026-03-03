@@ -18,7 +18,7 @@ private:
     size_t m_StringLength = 0;           // 当前存储的字符串长度（含null）
 
     HANDLE m_hMutex = NULL;             // 命名互斥量，用于跨进程同步
-    wchar_t m_MutexName[256];           // 互斥量名称
+    wchar_t m_MutexName[256] = L"";           // 互斥量名称
 
     // 固定的 GUID，所有进程使用同一个
     static constexpr wchar_t GUID[] = L"a1b2c3d4-e5f6-7890-abcd-ef1234567890";
