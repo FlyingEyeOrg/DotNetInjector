@@ -1,6 +1,5 @@
 ﻿using Autofac;
 using Autofac.Extensions.DependencyInjection;
-using DotNetInjector.ViewModel;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -23,11 +22,11 @@ namespace DotNetInjector
         {
             Log.Logger = new LoggerConfiguration()
             .Enrich.FromLogContext()
-            #if RELEASE
+#if RELEASE
             .MinimumLevel.Information()
-            #else
+#else
             .MinimumLevel.Debug()
-            #endif
+#endif
             .WriteTo.File(
                   path: "logs/app/log-.txt", // 注意路径和文件名格式
                   rollingInterval: RollingInterval.Day, // 按天滚动
