@@ -20,6 +20,19 @@ private:
     HANDLE m_hMutex = NULL;             // 命名互斥量，用于跨进程同步
     wchar_t m_MutexName[256];           // 互斥量名称
 
+    // 固定的 GUID，所有进程使用同一个
+    static constexpr wchar_t GUID[] = L"a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+
+    // 生成带 GUID 前缀的名称
+    static std::wstring MakeUniqueName(const wchar_t* baseName)
+    {
+        std::wstring uniqueName = L"[";
+        uniqueName += GUID;
+        uniqueName += L"]-";
+        uniqueName += baseName;
+        return uniqueName;
+    }
+
 public:
     SharedMemory() = default;
 
@@ -29,19 +42,22 @@ public:
     }
 
     // 创建共享内存 + 互斥量
-    bool Create(const wchar_t* name, size_t bufferSize)
+    bool Create(const wchar_t* baseName, size_t bufferSize)
     {
+        // 生成唯一名称
+        std::wstring uniqueName = MakeUniqueName(baseName);
+
         m_BufferSize = bufferSize;
         m_StringLength = 0;
 
-        // 1. 创建共享内存
+        // 1. 创建共享内存（使用唯一名称）
         m_hMapFile = CreateFileMappingW(
             INVALID_HANDLE_VALUE,
             NULL,
             PAGE_READWRITE,
             0,
             (DWORD)bufferSize,
-            name
+            uniqueName.c_str()
         );
         if (!m_hMapFile)
             return false;
@@ -57,8 +73,8 @@ public:
         // 清空内存并初始化为空字符串
         memset(m_pData, 0, bufferSize);
 
-        // 2. 创建命名互斥量
-        swprintf_s(m_MutexName, L"Global\\ProcessInjector_SharedMemory_Mutex_%s", name);
+        // 2. 创建命名互斥量（使用基础名称）
+        swprintf_s(m_MutexName, L"Global\\[%s]-ProcessInjector_SharedMemory_Mutex_%s", GUID, baseName);
         m_hMutex = CreateMutexW(
             NULL,
             FALSE,
@@ -75,16 +91,19 @@ public:
     }
 
     // 打开已有的共享内存 + 互斥量
-    bool Open(const wchar_t* name, size_t bufferSize)
+    bool Open(const wchar_t* baseName, size_t bufferSize)
     {
+        // 生成唯一名称（必须与创建时一致）
+        std::wstring uniqueName = MakeUniqueName(baseName);
+
         m_BufferSize = bufferSize;
         m_StringLength = 0;
 
-        // 1. 打开共享内存
+        // 1. 打开共享内存（使用唯一名称）
         m_hMapFile = OpenFileMappingW(
             FILE_MAP_ALL_ACCESS,
             FALSE,
-            name
+            uniqueName.c_str()
         );
         if (!m_hMapFile)
             return false;
@@ -103,8 +122,8 @@ public:
             m_StringLength = wcslen(m_pData);
         }
 
-        // 2. 打开同名互斥量
-        swprintf_s(m_MutexName, L"Global\\ProcessInjector_SharedMemory_Mutex_%s", name);
+        // 2. 打开同名互斥量（使用基础名称）
+        swprintf_s(m_MutexName, L"Global\\ProcessInjector_SharedMemory_Mutex_%s", baseName);
         m_hMutex = OpenMutexW(
             MUTEX_ALL_ACCESS,
             FALSE,
@@ -284,5 +303,15 @@ public:
     const wchar_t* GetData() const
     {
         return m_pData;
+    }
+
+    // 获取生成的唯一名称（调试用）
+    static std::wstring GetUniqueName(const wchar_t* baseName)
+    {
+        std::wstring uniqueName = L"[";
+        uniqueName += GUID;
+        uniqueName += L"]-";
+        uniqueName += baseName;
+        return uniqueName;
     }
 };
