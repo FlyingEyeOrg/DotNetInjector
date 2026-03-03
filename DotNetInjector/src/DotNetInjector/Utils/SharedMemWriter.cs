@@ -11,6 +11,7 @@ namespace DotNetInjector.Utils
         private long _size;
         private string? _name;
         private bool _disposed = false;
+        private readonly string AppID = "b62658dd-18f4-4de3-a09c-53c6c6cbf7d4";
 
         /// <summary>
         /// 共享内存名称
@@ -25,12 +26,12 @@ namespace DotNetInjector.Utils
         /// <summary>
         /// 创建或打开共享内存
         /// </summary>
-        /// <param name="name">共享内存名称</param>
+        /// <param name="baseName">共享内存名称</param>
         /// <param name="size">共享内存大小（字节）</param>
-        public void Create(string name, long size)
+        public void Create(string baseName, long size)
         {
-            if (string.IsNullOrEmpty(name))
-                throw new ArgumentNullException(nameof(name), "共享内存名称不能为空。");
+            if (string.IsNullOrEmpty(baseName))
+                throw new ArgumentNullException(nameof(baseName), "共享内存名称不能为空。");
 
             if (size <= 0)
                 throw new ArgumentOutOfRangeException(nameof(size), "共享内存大小必须大于 0。");
@@ -38,13 +39,13 @@ namespace DotNetInjector.Utils
             if (_mmf != null)
                 throw new InvalidOperationException("共享内存已经创建，不能重复创建。");
 
-            _name = name;
+            _name = baseName;
             _size = size;
 
             try
             {
                 // 创建或打开共享内存
-                _mmf = MemoryMappedFile.CreateOrOpen(name, size, MemoryMappedFileAccess.ReadWrite);
+                _mmf = MemoryMappedFile.CreateOrOpen($"Global\\[{AppID}]-ProcessInjector_SharedMemory_Mutex_{baseName}", size, MemoryMappedFileAccess.ReadWrite);
                 // 创建访问器
                 _accessor = _mmf.CreateViewAccessor(0, size, MemoryMappedFileAccess.ReadWrite);
             }
@@ -55,7 +56,7 @@ namespace DotNetInjector.Utils
                 _accessor = null;
                 _mmf?.Dispose();
                 _mmf = null;
-                throw new InvalidOperationException($"创建共享内存 '{name}' 失败。", ex);
+                throw new InvalidOperationException($"创建共享内存 '{baseName}' 失败。", ex);
             }
         }
 
