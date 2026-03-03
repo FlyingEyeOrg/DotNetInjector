@@ -19,6 +19,7 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)logger.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)pch.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)shared_memory.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)string_converter.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="$(MSBuildThisFileDirectory)logger.cpp" />
