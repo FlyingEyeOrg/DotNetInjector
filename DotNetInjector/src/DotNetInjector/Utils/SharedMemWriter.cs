@@ -71,9 +71,8 @@ namespace DotNetInjector.Utils
         }
 
         /// <summary>
-        /// 向共享内存写入字符串（UTF-8 编码，线程/进程安全）
+        /// 向共享内存写入字符串（UTF-16 编码，与 C++ wchar_t* 兼容，线程/进程安全）
         /// </summary>
-        /// <param name="data">要写入的字符串</param>
         public void Write(string data)
         {
             if (_disposed)
@@ -82,23 +81,31 @@ namespace DotNetInjector.Utils
             if (_accessor == null)
                 throw new InvalidOperationException("共享内存尚未创建，请先调用 Create 方法。");
 
-            if (string.IsNullOrEmpty(data))
-            {
-                // 写入空字符串，只需写入终止符
-                SafeWrite(() => _accessor.Write(0, (byte)0));
-                return;
-            }
-
-            byte[] bytes = Encoding.UTF8.GetBytes(data);
-            int length = Math.Min(bytes.Length, (int)_size - 1); // 留一个字节给 '\0'
-
-            if (length <= 0)
-                return; // 空间不够存任何字符（除了终止符）
-
             SafeWrite(() =>
             {
-                _accessor.WriteArray(0, bytes, 0, length);
-                _accessor.Write(length, (byte)0); // 手动加个 \0 结尾
+                if (string.IsNullOrEmpty(data))
+                {
+                    // 写入宽字符串终止符 \0\0（两个字节）
+                    _accessor.Write(0, (short)0);
+                    return;
+                }
+
+                // 转成 UTF-16 字节数组（不包含 BOM）
+                byte[] bytes = Encoding.Unicode.GetBytes(data);
+                int byteCount = bytes.Length;
+
+                // 检查空间：需要 byteCount + 2 字节（最后的 \0\0）
+                if (byteCount + 2 > _size)
+                    throw new InvalidOperationException("字符串太长，超出共享内存容量。");
+
+                // 写入字符串内容（每个字符 2 字节）
+                for (int i = 0; i < byteCount; i++)
+                {
+                    _accessor.Write(i, bytes[i]);
+                }
+
+                // 写入宽字符串终止符 \0\0
+                _accessor.Write(byteCount, (short)0);
             });
         }
 
