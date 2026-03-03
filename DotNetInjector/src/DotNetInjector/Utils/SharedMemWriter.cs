@@ -45,7 +45,7 @@ namespace DotNetInjector.Utils
             try
             {
                 // 创建或打开共享内存
-                _mmf = MemoryMappedFile.CreateOrOpen($"Global\\[{AppID}]-ProcessInjector_SharedMemory_Mutex_{baseName}", size, MemoryMappedFileAccess.ReadWrite);
+                _mmf = MemoryMappedFile.CreateOrOpen($"{AppID}-{baseName}", size, MemoryMappedFileAccess.ReadWrite);
                 // 创建访问器
                 _accessor = _mmf.CreateViewAccessor(0, size, MemoryMappedFileAccess.ReadWrite);
             }

@@ -3,6 +3,7 @@ using Autofac.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Serilog;
 using System.Windows;
 
@@ -20,42 +21,54 @@ namespace DotNetInjector
 
         private void App_Startup(object sender, StartupEventArgs e)
         {
+            // 1. 先创建 Serilog 全局日志（可选，主要用于非 DI 场景）
             Log.Logger = new LoggerConfiguration()
-            .Enrich.FromLogContext()
+                .Enrich.FromLogContext()
 #if RELEASE
-            .MinimumLevel.Information()
+                .MinimumLevel.Information()
 #else
-            .MinimumLevel.Debug()
+                .MinimumLevel.Debug()
 #endif
-            .WriteTo.File(
-                  path: "logs/app/log-.txt", // 注意路径和文件名格式
-                  rollingInterval: RollingInterval.Day, // 按天滚动
-                  rollOnFileSizeLimit: true, // 在文件大小达到限制时也滚动
-                  retainedFileCountLimit: 7, // 保留最近7天的日志文件
-                  outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}",
-                  fileSizeLimitBytes: 10 * 1024 * 1024 // 每个文件最大10MB
-            )
-            .CreateLogger();
+                .WriteTo.File(
+                    path: "logs/app/log-.txt",
+                    rollingInterval: RollingInterval.Day,
+                    rollOnFileSizeLimit: true,
+                    retainedFileCountLimit: 7,
+                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}",
+                    fileSizeLimitBytes: 10 * 1024 * 1024
+                )
+                .CreateLogger();
 
-            Log.Logger.Information("应用程序启动！");
+            Log.Information("应用程序启动！");
+
 #if RELEASE
-            var environmentName = Microsoft.Extensions.Hosting.Environments.Production;
+    var environmentName = Environments.Production;
 #else
-            var environmentName = Microsoft.Extensions.Hosting.Environments.Development;
+            var environmentName = Environments.Development;
 #endif
+
+            // 2. 创建 HostBuilder
             var builder = Host.CreateApplicationBuilder();
-            builder.ConfigureContainer(new AutofacServiceProviderFactory(), builder =>
-            {
-                builder.RegisterModule<DotNetInjectorModule>();
-            });
-            builder.Configuration.SetBasePath(AppContext.BaseDirectory)
-            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-            .AddJsonFile($"appsettings.{environmentName}.json", optional: true)
-            .AddEnvironmentVariables();
+
+            // 3. 先配置 Serilog（关键：必须在 Build 之前）
             builder.Services.AddSerilog();
 
+            // 4. 配置 Autofac
+            builder.ConfigureContainer(new AutofacServiceProviderFactory(), autofacBuilder =>
+            {
+                autofacBuilder.RegisterModule<DotNetInjectorModule>();
+            });
+
+            // 5. 配置 appsettings
+            builder.Configuration.SetBasePath(AppContext.BaseDirectory)
+                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                .AddJsonFile($"appsettings.{environmentName}.json", optional: true)
+                .AddEnvironmentVariables();
+
+            // 6. 构建并启动 Host
             var host = builder.Build();
             host.Start();
+
             var mainWindow = host.Services.GetRequiredService<MainWindow>();
             mainWindow.Show();
             this.MainWindow = mainWindow;

@@ -4,9 +4,89 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:DotNetInjector"
+        xmlns:hc="https://handyorg.github.io/handycontrol"
+        xmlns:vm="clr-namespace:DotNetInjector.ViewModel"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
-    <Grid>
-        
-    </Grid>
+        Title="MainWindow"
+        Height="450"
+        Width="800"
+        d:DataContext="{d:DesignInstance vm:MainWindowViewModel}">
+    <StackPanel Margin="8">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="120" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Style="{StaticResource TextBlockDefault}"
+                       Margin="0 0 8 0"
+                       HorizontalAlignment="Right">DotNet SDK 版本：</TextBlock>
+            <ComboBox Grid.Column="1"
+                      Style="{StaticResource ComboBoxExtend}"
+                      IsEditable="True"
+                      ItemsSource="{Binding FrameworkVersionList}"
+                      hc:InfoElement.Placeholder="请选择或输入 DotNet SDK 版本"></ComboBox>
+        </Grid>
+        <Grid Margin="0 8 0 0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="120" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Style="{StaticResource TextBlockDefault}"
+                       HorizontalAlignment="Right"
+                       Margin="0 0 8 0">程序集路径：</TextBlock>
+            <TextBox Grid.Column="1"
+                     Margin="0 0 8 0"
+                     Style="{StaticResource TextBoxExtend}"
+                     hc:InfoElement.Placeholder="请输入程序集路径"
+                     Text="{Binding AssemblyPath}"></TextBox>
+            <Button Grid.Column="2"
+                    Width="52"
+                    hc:IconElement.Geometry="{StaticResource SearchGeometry}"
+                    hc:BorderElement.CornerRadius="15"
+                    Command="{Binding SelectFileCommand}"></Button>
+        </Grid>
+        <Grid Margin="0 8 0 0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="120" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Style="{StaticResource TextBlockDefault}"
+                       Margin="0 0 8 0"
+                       HorizontalAlignment="Right">调用类型名称：</TextBlock>
+            <TextBox Grid.Column="1"
+                     Style="{StaticResource TextBoxExtend}"
+                     hc:InfoElement.Placeholder="请输入调用类型名称（包含名称空间）"
+                     Text="{Binding EntryClass}"></TextBox>
+        </Grid>
+        <Grid Margin="0 8 0 0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="120" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Style="{StaticResource TextBlockDefault}"
+                       Margin="0 0 8 0"
+                       HorizontalAlignment="Right">调用方法名称：</TextBlock>
+            <TextBox Grid.Column="1"
+                     Style="{StaticResource TextBoxExtend}"
+                     hc:InfoElement.Placeholder="请输入调用方法名称（静态方法，且只有一个 string 类型的参数，返回值为 void）"
+                     Text="{Binding EntryMethod}"></TextBox>
+        </Grid>
+        <Grid Margin="0 8 0 0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="120" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Style="{StaticResource TextBlockDefault}"
+                       Margin="0 0 8 0"
+                       HorizontalAlignment="Right">调用方法参数：</TextBlock>
+            <TextBox Grid.Column="1"
+                     Style="{StaticResource TextBoxExtend}"
+                     hc:InfoElement.Placeholder="请输入调用方法参数（可留空）"
+                     Text="{Binding EntryMethodArgument}"></TextBox>
+        </Grid>
+        <Button Style="{StaticResource ButtonPrimary}"
+                Margin="0 8 0 0"
+                Command="{Binding SaveDataCommand}">保存数据</Button>
+    </StackPanel>
 </Window>
