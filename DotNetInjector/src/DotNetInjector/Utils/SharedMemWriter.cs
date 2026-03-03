@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO.MemoryMappedFiles;
 using System.Text;
+using System.Threading;
 
 namespace DotNetInjector.Utils
 {
@@ -12,6 +13,9 @@ namespace DotNetInjector.Utils
         private string? _name;
         private bool _disposed = false;
         private readonly string AppID = "b62658dd-18f4-4de3-a09c-53c6c6cbf7d4";
+
+        // 互斥量，与 C++ 命名保持一致
+        private Mutex? _mutex;
 
         /// <summary>
         /// 共享内存名称
@@ -48,6 +52,10 @@ namespace DotNetInjector.Utils
                 _mmf = MemoryMappedFile.CreateOrOpen($"{AppID}-{baseName}", size, MemoryMappedFileAccess.ReadWrite);
                 // 创建访问器
                 _accessor = _mmf.CreateViewAccessor(0, size, MemoryMappedFileAccess.ReadWrite);
+
+                // 创建命名互斥量，与 C++ 一致
+                string mutexName = $"Global\\[{AppID}]-ProcessInjector_SharedMemory_Mutex_{baseName}";
+                _mutex = new Mutex(false, mutexName);
             }
             catch (Exception ex)
             {
@@ -56,12 +64,14 @@ namespace DotNetInjector.Utils
                 _accessor = null;
                 _mmf?.Dispose();
                 _mmf = null;
+                _mutex?.Dispose();
+                _mutex = null;
                 throw new InvalidOperationException($"创建共享内存 '{baseName}' 失败。", ex);
             }
         }
 
         /// <summary>
-        /// 向共享内存写入字符串（UTF-8 编码）
+        /// 向共享内存写入字符串（UTF-8 编码，线程/进程安全）
         /// </summary>
         /// <param name="data">要写入的字符串</param>
         public void Write(string data)
@@ -75,7 +85,7 @@ namespace DotNetInjector.Utils
             if (string.IsNullOrEmpty(data))
             {
                 // 写入空字符串，只需写入终止符
-                _accessor.Write(0, (byte)0);
+                SafeWrite(() => _accessor.Write(0, (byte)0));
                 return;
             }
 
@@ -85,8 +95,30 @@ namespace DotNetInjector.Utils
             if (length <= 0)
                 return; // 空间不够存任何字符（除了终止符）
 
-            _accessor.WriteArray(0, bytes, 0, length);
-            _accessor.Write(length, (byte)0); // 手动加个 \0 结尾
+            SafeWrite(() =>
+            {
+                _accessor.WriteArray(0, bytes, 0, length);
+                _accessor.Write(length, (byte)0); // 手动加个 \0 结尾
+            });
+        }
+
+        /// <summary>
+        /// 带互斥量的安全写入
+        /// </summary>
+        private void SafeWrite(Action writeAction)
+        {
+            if (_mutex == null)
+                throw new InvalidOperationException("互斥量未初始化。");
+
+            _mutex.WaitOne();
+            try
+            {
+                writeAction();
+            }
+            finally
+            {
+                _mutex.ReleaseMutex();
+            }
         }
 
         /// <summary>
@@ -111,6 +143,9 @@ namespace DotNetInjector.Utils
 
                 _mmf?.Dispose();
                 _mmf = null;
+
+                _mutex?.Dispose();
+                _mutex = null;
             }
 
             _disposed = true;
