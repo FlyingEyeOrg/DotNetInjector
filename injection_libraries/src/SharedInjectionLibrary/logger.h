@@ -15,7 +15,7 @@ private:
     static std::wstring s_LogFile;
     static std::mutex s_LockObj;
 
-    static std::wstring GetBaseDirectory();
+    static std::wstring GetTempDirectory();
     static void InternalInitialize();
     static std::string ToUtf8(const std::wstring& wstr);
     static std::string GetTimestamp();

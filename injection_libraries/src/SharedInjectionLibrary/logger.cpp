@@ -9,18 +9,27 @@ std::wstring Logger::s_LogDir;
 std::wstring Logger::s_LogFile;
 std::mutex Logger::s_LockObj;
 
-std::wstring Logger::GetBaseDirectory()
+std::wstring Logger::GetTempDirectory()
 {
 	wchar_t buffer[MAX_PATH];
-	GetModuleFileNameW(NULL, buffer, MAX_PATH);
-	std::wstring path(buffer);
-	size_t lastSlash = path.find_last_of(L"\\/");
-	return (lastSlash != std::wstring::npos) ? path.substr(0, lastSlash) : path;
+	DWORD len = GetTempPathW(MAX_PATH, buffer);
+	if (len > 0 && len < MAX_PATH)
+	{
+		std::wstring tempPath(buffer);
+		// 移除末尾的反斜杠（如果有）
+		if (!tempPath.empty() && (tempPath.back() == L'\\' || tempPath.back() == L'/'))
+		{
+			tempPath.pop_back();
+		}
+		return tempPath;
+	}
+	// 如果获取失败，返回当前目录作为后备
+	return L".";
 }
 
 void Logger::InternalInitialize()
 {
-	s_LogDir = GetBaseDirectory() + L"\\" + L"[" + LogID + L"]-InjectionLogs";
+	s_LogDir = GetTempDirectory() + L"\\" + L"[" + LogID + L"]-InjectionLogs";
 	std::filesystem::create_directories(s_LogDir);
 	s_LogFile = s_LogDir + L"\\injection.log";
 }
