@@ -11,6 +11,12 @@
 * 入口类型约定：入口类型不能是嵌套类
 * 入口方法约定：入口方法必须有且只有一个 string 类型的参数，返回值为 int，必须是 public static 签名
 
+## 程序原理
+
+使用 c++ 编写了一个 windows 进程注入工具 `injector.exe`，`DotNetInjector` 调用 `injector.exe` 对目标 .net 进程进行注入非托管程序集。
+`FrameworkInjectionLibrary` 和 `CoreInjectionLibrary` 是两个 C++ 非托管程序集，这两个非托管程序集的作用是将托管的 .NET 程序集注入到 .NET CLR，
+然后调用约定的入口方法，在托管环境执行自定义的 .NET 代码。
+
 ## 类库示例
 
 ```c#
