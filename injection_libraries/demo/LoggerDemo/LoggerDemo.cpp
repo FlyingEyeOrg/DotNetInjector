@@ -3,6 +3,8 @@
 
 #include <iostream>
 #include "Logger.h"
+#include "injection_parameters.h"
+#include "string_converter.h"
 
 int main()
 {
@@ -10,5 +12,20 @@ int main()
 	Logger::Initialize();
 	Logger::Log("Hello");
 	std::cout << "hello" << std::endl;
+
+	InjectionParameters parameters;
+
+	auto isOpen = parameters.Open();
+
+	if (!isOpen)
+	{
+		std::cout << "open shared memory failed." << std::endl;
+		return 1;
+	}
+
+	std::cout << "parameters: " << std::endl;
+	auto wstr = parameters.GetDebugSummary();
+	auto gbk = ::string_convertor::wstring_to_gbk(wstr);
+	std::cout << gbk << std::endl;
 }
 
