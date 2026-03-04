@@ -86,8 +86,21 @@
                      hc:InfoElement.Placeholder="请输入调用方法参数（可留空）"
                      Text="{Binding EntryMethodArgument}"></TextBox>
         </Grid>
+        <Grid Margin="0 8 0 0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="120" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Style="{StaticResource TextBlockDefault}"
+                       Margin="0 0 8 0"
+                       HorizontalAlignment="Right">目标进程Id：</TextBlock>
+            <TextBox Grid.Column="1"
+                     Style="{StaticResource TextBoxExtend}"
+                     hc:InfoElement.Placeholder="请输入目标进程 Id"
+                     Text="{Binding ProcessId}"></TextBox>
+        </Grid>
         <Button Style="{StaticResource ButtonPrimary}"
                 Margin="0 8 0 0"
-                Command="{Binding SaveDataCommand}">保存数据</Button>
+                Command="{Binding SaveDataCommand}">进程注入</Button>
     </StackPanel>
 </Window>

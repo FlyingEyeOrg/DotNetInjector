@@ -15,7 +15,7 @@ namespace DotNetInjector.ViewModel
 
         public ICommand SelectFileCommand { get; }
 
-        public ICommand SaveDataCommand { get; }
+        public ICommand InjectCommand { get; }
 
         #endregion
 
@@ -57,6 +57,11 @@ namespace DotNetInjector.ViewModel
         public string? EntryMethodArgument { get; set; }
 
         /// <summary>
+        ///  目标进程 id
+        /// </summary>
+        public int? ProcessId { get; set; }
+
+        /// <summary>
         /// .NET Framework 版本列表
         /// </summary>
         public List<string> FrameworkVersionList { get; } = new List<string> { ".NetCore", "Mono" };
@@ -96,7 +101,7 @@ namespace DotNetInjector.ViewModel
 
             // 初始化命令
             SelectFileCommand = new RelayCommand(SelectFile);
-            SaveDataCommand = new RelayCommand(SaveData);
+            InjectCommand = new RelayCommand(Inject);
 
             _logger.LogInformation("MainWindowViewModel 初始化完成。");
         }
@@ -226,9 +231,9 @@ namespace DotNetInjector.ViewModel
         }
 
         /// <summary>
-        /// 保存数据到共享内存
+        /// 保存数据到共享内存，然后注入目标进程
         /// </summary>
-        private void SaveData()
+        private void Inject()
         {
             try
             {
@@ -263,6 +268,28 @@ namespace DotNetInjector.ViewModel
                     return;
                 }
 
+                // 验证 ProcessId（必填）
+                if (!ProcessId.HasValue || ProcessId.Value <= 0)
+                {
+                    MessageBox.Show(
+                        "请输入有效的目标进程 ID。",
+                        "参数缺失",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                // 验证 ProcessId 对应的进程是否存在
+                if (!System.Diagnostics.Process.GetProcesses().Any(p => p.Id == ProcessId.Value))
+                {
+                    MessageBox.Show(
+                        $"进程 ID {ProcessId.Value} 不存在，请检查后重试。",
+                        "进程不存在",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
                 // 写入共享内存
                 _frameworkVersionMem.Write(FrameworkVersion ?? string.Empty);
                 _assemblyPathMem.Write(AssemblyPath);
@@ -270,9 +297,9 @@ namespace DotNetInjector.ViewModel
                 _entryMethodMem.Write(EntryMethod);
                 _entryMethodArgumentMem.Write(EntryMethodArgument ?? string.Empty);
 
-                _logger.LogInformation("数据已成功写入共享内存。");
+                _logger.LogInformation("数据已成功写入共享内存，准备注入进程 {ProcessId}。", ProcessId.Value);
                 MessageBox.Show(
-                    "数据已成功写入共享内存！",
+                    $"数据已成功写入共享内存！\n目标进程: {ProcessId.Value}",
                     "保存成功",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
