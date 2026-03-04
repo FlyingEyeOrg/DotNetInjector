@@ -21,6 +21,7 @@
                        Margin="0 0 8 0"
                        HorizontalAlignment="Right">DotNet SDK 版本：</TextBlock>
             <ComboBox Grid.Column="1"
+                      SelectedValue="{Binding FrameworkVersion}"
                       Style="{StaticResource ComboBoxExtend}"
                       IsEditable="True"
                       ItemsSource="{Binding FrameworkVersionList}"
