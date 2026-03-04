@@ -17,6 +17,10 @@
 `FrameworkInjectionLibrary` 和 `CoreInjectionLibrary` 是两个 C++ 非托管程序集，这两个非托管程序集的作用是将托管的 .NET 程序集注入到 .NET CLR，
 然后调用约定的入口方法，在托管环境执行自定义的 .NET 代码。
 
+## 日志
+
+可以在目标进程的 exe 目录下，查找 `[b62658dd-18f4-4de3-a09c-53c6c6cbf7d4]-InjectionLogs` 目录，该目录存储的是注入过程的日志文件。
+
 ## 类库示例
 
 ```c#
