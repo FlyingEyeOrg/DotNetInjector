@@ -144,7 +144,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 
 		// 10. 提取命名空间和类名
 		std::string className, namespaceName;
-		ExtractNamespaceAndClass(gbkEntryClass, className, namespaceName);
+		ExtractNamespaceAndClass(gbkEntryClass, namespaceName, className);
 
 		// 11. 查找类
 		MonoClass* klass = g_mono_class_from_name(image, namespaceName.c_str(), className.c_str());
