@@ -67,14 +67,6 @@ namespace DotNetInjector.ViewModel
         /// .NET Framework 版本列表
         /// </summary>
         public List<string> FrameworkVersionList { get; } = new List<string> { ".NetCore", "Mono" };
-
-        /// <summary>
-        /// 目标进程架构
-        /// </summary>
-        public string TargetProcessArchitecture { get; set; } = "x64";
-
-        public List<string> ProcessArchitectureList { get; set; } = new List<string>() { "x86", "x64" };
-
         #endregion
 
         #region 私有字段
@@ -239,10 +231,6 @@ namespace DotNetInjector.ViewModel
             }
         }
 
-        [DllImport("kernel32.dll", SetLastError = true, CallingConvention = CallingConvention.Winapi)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool IsWow64Process(IntPtr process, out bool wow64Process);
-
         /// <summary>
         /// 保存数据到共享内存，然后注入目标进程
         /// </summary>
@@ -306,7 +294,6 @@ namespace DotNetInjector.ViewModel
                     return;
                 }
 
-
                 // 写入共享内存
                 _frameworkVersionMem.Write(FrameworkVersion ?? string.Empty);
                 _assemblyPathMem.Write(AssemblyPath);
@@ -320,7 +307,7 @@ namespace DotNetInjector.ViewModel
                     targetProcess.ProcessName);
 
                 // 获取工具路径和注入库路径
-                if (!TryGetInjectorPaths(out string toolPath, out string unmanagedAssemblyPath))
+                if (!TryGetInjectorPaths(targetProcess, out string toolPath, out string unmanagedAssemblyPath))
                 {
                     return;
                 }
@@ -432,7 +419,7 @@ namespace DotNetInjector.ViewModel
         /// <param name="toolPath">输出：注入器 exe 路径</param>
         /// <param name="unmanagedAssemblyPath">输出：注入库 dll 路径</param>
         /// <returns>是否成功获取路径</returns>
-        private bool TryGetInjectorPaths(out string toolPath, out string unmanagedAssemblyPath)
+        private bool TryGetInjectorPaths(Process targetProcess, out string toolPath, out string unmanagedAssemblyPath)
         {
             toolPath = string.Empty;
             unmanagedAssemblyPath = string.Empty;
@@ -440,7 +427,7 @@ namespace DotNetInjector.ViewModel
             try
             {
                 string baseDirectory = AppContext.BaseDirectory;
-                string archFolder = Environment.Is64BitProcess ? "x64" : "x86";
+                string archFolder = Is64Bit(targetProcess) ? "x64" : "x86";
 
                 // 注入器路径
                 toolPath = Path.Combine(baseDirectory, "Tools", archFolder, "injector.exe");
@@ -479,6 +466,32 @@ namespace DotNetInjector.ViewModel
             }
         }
 
+        [DllImport("kernel32.dll", SetLastError = true, CallingConvention = CallingConvention.Winapi)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool IsWow64Process(IntPtr process, out bool wow64Process);
+
+        /// <summary>
+        /// 判断进程是 64 位还是 32 位
+        /// </summary>
+        /// <param name="process">目标进程</param>
+        /// <returns>true = x64, false = x86</returns>
+        public static bool Is64Bit(Process process)
+        {
+            if (!Environment.Is64BitOperatingSystem)
+            {
+                // 32 位系统上所有进程都是 32 位的
+                return false;
+            }
+
+            if (!Environment.Is64BitProcess)
+            {
+                throw new InvalidOperationException(
+                    "当前程序是 32 位，无法检测其他进程的位数。");
+            }
+
+            IsWow64Process(process.Handle, out bool isWow64);
+            return !isWow64; // 不是 Wow64 = 原生 64 位
+        }
         #endregion
     }
 }
