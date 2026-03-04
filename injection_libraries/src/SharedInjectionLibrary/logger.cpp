@@ -20,7 +20,7 @@ std::wstring Logger::GetBaseDirectory()
 
 void Logger::InternalInitialize()
 {
-    s_LogDir = GetBaseDirectory() + L"\\InjectionLogs[" + std::wstring(LibraryID) + L"]";
+    s_LogDir = GetBaseDirectory() + L"\\InjectionLogs[" + std::wstring(LogID) + L"]";
     std::filesystem::create_directories(s_LogDir);
     s_LogFile = s_LogDir + L"\\injection.log";
 }

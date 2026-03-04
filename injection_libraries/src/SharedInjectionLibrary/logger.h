@@ -9,7 +9,7 @@
 class Logger final
 {
 private:
-    static constexpr const wchar_t* LibraryID = APP_ID;
+    static constexpr const wchar_t* LogID = APP_ID;
 
     static std::wstring s_LogDir;
     static std::wstring s_LogFile;
