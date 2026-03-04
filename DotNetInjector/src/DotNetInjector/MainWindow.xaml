@@ -35,11 +35,11 @@
             </Grid.ColumnDefinitions>
             <TextBlock Style="{StaticResource TextBlockDefault}"
                        HorizontalAlignment="Right"
-                       Margin="0 0 8 0">程序集路径：</TextBlock>
+                       Margin="0 0 8 0">托管程序集路径：</TextBlock>
             <TextBox Grid.Column="1"
                      Margin="0 0 8 0"
                      Style="{StaticResource TextBoxExtend}"
-                     hc:InfoElement.Placeholder="请输入程序集路径"
+                     hc:InfoElement.Placeholder="请输入托管程序集路径"
                      Text="{Binding AssemblyPath}"></TextBox>
             <Button Grid.Column="2"
                     Width="52"

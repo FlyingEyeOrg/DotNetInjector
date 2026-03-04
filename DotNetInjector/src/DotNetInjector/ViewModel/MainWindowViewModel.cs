@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using DotNetInjector.Utils;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Input;
@@ -280,7 +281,10 @@ namespace DotNetInjector.ViewModel
                 }
 
                 // 验证 ProcessId 对应的进程是否存在
-                if (!System.Diagnostics.Process.GetProcesses().Any(p => p.Id == ProcessId.Value))
+                var targetProcess = System.Diagnostics.Process.GetProcesses()
+                    .FirstOrDefault(p => p.Id == ProcessId.Value);
+
+                if (targetProcess == null)
                 {
                     MessageBox.Show(
                         $"进程 ID {ProcessId.Value} 不存在，请检查后重试。",
@@ -297,21 +301,168 @@ namespace DotNetInjector.ViewModel
                 _entryMethodMem.Write(EntryMethod);
                 _entryMethodArgumentMem.Write(EntryMethodArgument ?? string.Empty);
 
-                _logger.LogInformation("数据已成功写入共享内存，准备注入进程 {ProcessId}。", ProcessId.Value);
-                MessageBox.Show(
-                    $"数据已成功写入共享内存！\n目标进程: {ProcessId.Value}",
-                    "保存成功",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                _logger.LogInformation(
+                    "数据已成功写入共享内存，准备注入进程 {ProcessId} ({ProcessName})。",
+                    ProcessId.Value,
+                    targetProcess.ProcessName);
+
+                // 获取工具路径和注入库路径
+                if (!TryGetInjectorPaths(out string toolPath, out string unmanagedAssemblyPath))
+                {
+                    return;
+                }
+
+                // 校验文件是否存在
+                if (!File.Exists(toolPath))
+                {
+                    _logger.LogError("注入工具不存在: {ToolPath}", toolPath);
+                    MessageBox.Show(
+                        $"注入工具不存在，请检查安装是否完整。\n路径: {toolPath}",
+                        "文件缺失",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                    return;
+                }
+
+                if (!File.Exists(unmanagedAssemblyPath))
+                {
+                    _logger.LogError("注入库不存在: {UnmanagedAssemblyPath}", unmanagedAssemblyPath);
+                    MessageBox.Show(
+                        $"注入库不存在，请检查安装是否完整。\n路径: {unmanagedAssemblyPath}",
+                        "文件缺失",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                    return;
+                }
+
+                // 构建注入器参数
+                string arguments = $"\"{unmanagedAssemblyPath}\" -p {ProcessId.Value}";
+
+                _logger.LogInformation("启动注入器: {ToolPath} {Arguments}", toolPath, arguments);
+
+                // 启动注入进程
+                var processInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = toolPath,
+                    Arguments = arguments,
+                    UseShellExecute = false,  // 改为 false，避免弹控制台窗口
+                    CreateNoWindow = true,     // 不创建窗口
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+
+                using var process = System.Diagnostics.Process.Start(processInfo);
+
+                if (process == null)
+                {
+                    _logger.LogError("启动注入器失败。");
+                    MessageBox.Show(
+                        "启动注入器失败，请检查工具权限。",
+                        "启动失败",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                    return;
+                }
+
+                // 等待注入完成（设置超时）
+                bool exited = process.WaitForExit(30000); // 30 秒超时
+
+                if (!exited)
+                {
+                    process.Kill();
+                    _logger.LogError("注入器执行超时。");
+                    MessageBox.Show(
+                        "注入操作超时，可能目标进程无响应。",
+                        "超时",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                // 读取输出
+                string output = process.StandardOutput.ReadToEnd();
+                string error = process.StandardError.ReadToEnd();
+
+                if (process.ExitCode == 0)
+                {
+                    _logger.LogInformation("注入成功。输出: {Output}", output);
+                    MessageBox.Show(
+                        $"注入成功！\n目标进程: {ProcessId.Value} ({targetProcess.ProcessName})\n\n{output}",
+                        "注入成功",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                }
+                else
+                {
+                    _logger.LogError("注入失败，退出码: {ExitCode}，错误: {Error}", process.ExitCode, error);
+                    MessageBox.Show(
+                        $"注入失败！\n退出码: {process.ExitCode}\n错误: {error}\n\n{output}",
+                        "注入失败",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "保存数据到共享内存失败。");
+                _logger.LogError(ex, "注入过程发生错误。");
                 MessageBox.Show(
-                    "保存数据失败，请检查共享内存是否可用或是否被占用。",
+                    $"注入过程发生错误：\n{ex.Message}",
                     "错误",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// 根据当前进程位数和框架版本，获取注入器路径和注入库路径
+        /// </summary>
+        /// <param name="toolPath">输出：注入器 exe 路径</param>
+        /// <param name="unmanagedAssemblyPath">输出：注入库 dll 路径</param>
+        /// <returns>是否成功获取路径</returns>
+        private bool TryGetInjectorPaths(out string toolPath, out string unmanagedAssemblyPath)
+        {
+            toolPath = string.Empty;
+            unmanagedAssemblyPath = string.Empty;
+
+            try
+            {
+                string baseDirectory = AppContext.BaseDirectory;
+                string archFolder = Environment.Is64BitProcess ? "x64" : "x86";
+
+                // 注入器路径
+                toolPath = Path.Combine(baseDirectory, "Tools", archFolder, "injector.exe");
+
+                // 根据框架版本确定注入库
+                string? frameworkFolder = FrameworkVersion switch
+                {
+                    "Mono" => null, // Mono 暂不支持
+                    ".NetCore" => "CoreInjectionLibrary.dll",
+                    _ => "FrameworkInjectionLibrary.dll" // 默认 .NET Framework
+                };
+
+                if (frameworkFolder == null)
+                {
+                    MessageBox.Show(
+                        "Mono 框架暂不支持。",
+                        "不支持的框架",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return false;
+                }
+
+                unmanagedAssemblyPath = Path.Combine(baseDirectory, "Tools", archFolder, frameworkFolder);
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "获取注入器路径失败。");
+                MessageBox.Show(
+                    "获取注入器路径失败，请检查配置。",
+                    "错误",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+                return false;
             }
         }
 
