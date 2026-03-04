@@ -21,8 +21,17 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<None Update="Tools\x64\CoreInjectionLibrary.dll">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Tools\x64\FrameworkInjectionLibrary.dll">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
 		<None Update="Tools\x64\injector.exe">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Tools\x86\CoreInjectionLibrary.dll">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 		<None Update="Tools\x86\FrameworkInjectionLibrary.dll">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
