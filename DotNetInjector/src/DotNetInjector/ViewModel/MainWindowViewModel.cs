@@ -433,22 +433,12 @@ namespace DotNetInjector.ViewModel
                 toolPath = Path.Combine(baseDirectory, "Tools", archFolder, "injector.exe");
 
                 // 根据框架版本确定注入库
-                string? frameworkFolder = FrameworkVersion switch
+                string frameworkFolder = FrameworkVersion switch
                 {
                     "Mono" => "MonoInjectionLibrary.dll", // Mono 暂不支持
                     ".NetCore" => "CoreInjectionLibrary.dll",
                     _ => "FrameworkInjectionLibrary.dll" // 默认 .NET Framework
                 };
-
-                if (frameworkFolder == null)
-                {
-                    MessageBox.Show(
-                        "Mono 框架暂不支持。",
-                        "不支持的框架",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
-                    return false;
-                }
 
                 unmanagedAssemblyPath = Path.Combine(baseDirectory, "Tools", archFolder, frameworkFolder);
 
