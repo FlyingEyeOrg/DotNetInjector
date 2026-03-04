@@ -101,6 +101,6 @@
         </Grid>
         <Button Style="{StaticResource ButtonPrimary}"
                 Margin="0 8 0 0"
-                Command="{Binding SaveDataCommand}">进程注入</Button>
+                Command="{Binding InjectCommand}">进程注入</Button>
     </StackPanel>
 </Window>
