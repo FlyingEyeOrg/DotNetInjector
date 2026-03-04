@@ -435,7 +435,7 @@ namespace DotNetInjector.ViewModel
                 // 根据框架版本确定注入库
                 string? frameworkFolder = FrameworkVersion switch
                 {
-                    "Mono" => null, // Mono 暂不支持
+                    "Mono" => "MonoInjectionLibrary.dll", // Mono 暂不支持
                     ".NetCore" => "CoreInjectionLibrary.dll",
                     _ => "FrameworkInjectionLibrary.dll" // 默认 .NET Framework
                 };
