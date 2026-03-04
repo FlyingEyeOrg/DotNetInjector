@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
 
@@ -66,6 +67,13 @@ namespace DotNetInjector.ViewModel
         /// .NET Framework 版本列表
         /// </summary>
         public List<string> FrameworkVersionList { get; } = new List<string> { ".NetCore", "Mono" };
+
+        /// <summary>
+        /// 目标进程架构
+        /// </summary>
+        public string TargetProcessArchitecture { get; set; } = "x64";
+
+        public List<string> ProcessArchitectureList { get; set; } = new List<string>() { "x86", "x64" };
 
         #endregion
 
@@ -231,6 +239,10 @@ namespace DotNetInjector.ViewModel
             }
         }
 
+        [DllImport("kernel32.dll", SetLastError = true, CallingConvention = CallingConvention.Winapi)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool IsWow64Process(IntPtr process, out bool wow64Process);
+
         /// <summary>
         /// 保存数据到共享内存，然后注入目标进程
         /// </summary>
@@ -293,6 +305,7 @@ namespace DotNetInjector.ViewModel
                         MessageBoxImage.Warning);
                     return;
                 }
+
 
                 // 写入共享内存
                 _frameworkVersionMem.Write(FrameworkVersion ?? string.Empty);
