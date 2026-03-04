@@ -22,9 +22,12 @@
 
 	<ItemGroup>
 		<None Update="Tools\x64\FrameworkInjectionLibrary.dll" Condition="'$(Platform)' == 'x64' or '$(Platform)' == 'AnyCPU'">
-		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 		<None Update="Tools\x64\injector.exe" Condition="'$(Platform)' == 'x64' or '$(Platform)' == 'AnyCPU'">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Tools\x86\FrameworkInjectionLibrary.dll" Condition="'$(Platform)' == 'x86'">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 		<None Update="Tools\x86\injector.exe" Condition="'$(Platform)' == 'x86'">
