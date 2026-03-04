@@ -139,5 +139,6 @@ Global
 		src\SharedInjectionLibrary\SharedInjectionLibrary.vcxitems*{ac2039d4-30f1-437a-bd6b-6bc64151374d}*SharedItemsImports = 4
 		src\SharedInjectionLibrary\SharedInjectionLibrary.vcxitems*{b08fa5c1-b8f6-4ff9-aea6-009ee1afb799}*SharedItemsImports = 4
 		src\SharedInjectionLibrary\SharedInjectionLibrary.vcxitems*{e2723c73-2a38-4cae-85ea-cac072335890}*SharedItemsImports = 9
+		src\SharedInjectionLibrary\SharedInjectionLibrary.vcxitems*{fbd757db-b56f-4d3a-86e7-eab60e70a97b}*SharedItemsImports = 4
 	EndGlobalSection
 EndGlobal
