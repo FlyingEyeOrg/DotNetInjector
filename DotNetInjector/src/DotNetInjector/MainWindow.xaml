@@ -93,7 +93,7 @@
             </Grid.ColumnDefinitions>
             <TextBlock Style="{StaticResource TextBlockDefault}"
                        Margin="0 0 8 0"
-                       HorizontalAlignment="Right">目标进程Id：</TextBlock>
+                       HorizontalAlignment="Right">目标进程 ID：</TextBlock>
             <TextBox Grid.Column="1"
                      Style="{StaticResource TextBoxExtend}"
                      hc:InfoElement.Placeholder="请输入目标进程 Id"
