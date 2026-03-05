@@ -137,6 +137,43 @@ bool InitializeClrAndGetHost(ICLRRuntimeHost** ppHost)
 	auto entryMethod = parameters.GetEntryMethod();
 	auto arg = parameters.GetEntryArgument();
 
+	// 验证必需参数
+	if (assemblyFile.empty())
+	{
+		Logger::Log("Error: Assembly file path is empty.");
+		return FALSE;
+	}
+
+	if (entryClass.empty())
+	{
+		Logger::Log("Error: Entry class name is empty.");
+		return FALSE;
+	}
+
+	if (entryMethod.empty())
+	{
+		Logger::Log("Error: Entry method name is empty.");
+		return FALSE;
+	}
+
+	// 将 wstring 转换为 filesystem::path 以便进行文件验证
+	std::filesystem::path assemblyPath(assemblyFile);
+
+	// 验证程序集文件是否存在且为有效的 DLL 文件
+	if (!std::filesystem::exists(assemblyPath))
+	{
+		Logger::Log("Error: Assembly file does not exist: %s",
+			string_convertor::wstring_to_gbk(assemblyFile).c_str());
+		return FALSE;
+	}
+
+	if (assemblyPath.extension() != L".dll")
+	{
+		Logger::Log("Error: Assembly file is not a DLL: %s",
+			string_convertor::wstring_to_gbk(assemblyFile).c_str());
+		return FALSE;
+	}
+
 	Logger::Log("Executing managed method...");
 	Logger::Log("  Assembly: %s", string_convertor::wstring_to_gbk(assemblyFile).c_str());
 	Logger::Log("  Class:    %s", string_convertor::wstring_to_gbk(entryClass).c_str());
