@@ -23,19 +23,19 @@
 
 	<ItemGroup>
 		<None Update="Tools\x64\CoreInjectionLibrary.dll">
-		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 		<None Update="Tools\x64\FrameworkInjectionLibrary.dll">
-		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 		<None Update="Tools\x64\injector.exe">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 		<None Update="Tools\x64\MonoInjectionLibrary.dll">
-		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 		<None Update="Tools\x86\CoreInjectionLibrary.dll">
-		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 		<None Update="Tools\x86\FrameworkInjectionLibrary.dll">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -44,7 +44,23 @@
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 		<None Update="Tools\x86\MonoInjectionLibrary.dll">
-		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- x64 DLLs 放到 win-x64 运行时目录 -->
+		<None Update="Libs\SharedMemoryLib\x64\*.dll" Condition="'$(Platform)' == 'AnyCPU' OR '$(Platform)' == 'x64' OR '$(Platform)' == ''">
+			<Visible>false</Visible>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<Link>%(Filename)%(Extension)</Link>
+		</None>
+
+		<!-- x86 DLLs 放到 win-x86 运行时目录 -->
+		<None Update="Libs\SharedMemoryLib\x86\*.dll" Condition="'$(Platform)' == 'x86'">
+			<Visible>false</Visible>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<Link>%(Filename)%(Extension)</Link>
 		</None>
 	</ItemGroup>
 
