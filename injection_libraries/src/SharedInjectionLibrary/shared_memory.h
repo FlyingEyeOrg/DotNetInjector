@@ -27,7 +27,7 @@ private:
     // 生成带 GUID 前缀的名称
     static std::wstring MakeUniqueName(const wchar_t* baseName)
     {
-        std::wstring uniqueName = L"[";
+        std::wstring uniqueName = L"Global\\[";
         uniqueName += GUID;
         uniqueName += L"]-";
         uniqueName += baseName;
@@ -42,55 +42,6 @@ public:
         Close();
     }
 
-    // 创建共享内存 + 互斥量
-    bool Create(const wchar_t* baseName, size_t bufferSize)
-    {
-        // 生成唯一名称
-        std::wstring uniqueName = MakeUniqueName(baseName);
-
-        m_BufferSize = bufferSize;
-        m_StringLength = 0;
-
-        // 1. 创建共享内存（使用唯一名称）
-        m_hMapFile = CreateFileMappingW(
-            INVALID_HANDLE_VALUE,
-            NULL,
-            PAGE_READWRITE,
-            0,
-            (DWORD)bufferSize,
-            uniqueName.c_str()
-        );
-        if (!m_hMapFile)
-            return false;
-
-        m_pData = static_cast<wchar_t*>(MapViewOfFile(m_hMapFile, FILE_MAP_ALL_ACCESS, 0, 0, bufferSize));
-        if (!m_pData)
-        {
-            CloseHandle(m_hMapFile);
-            m_hMapFile = NULL;
-            return false;
-        }
-
-        // 清空内存并初始化为空字符串
-        memset(m_pData, 0, bufferSize);
-
-        // 2. 创建命名互斥量（使用基础名称）
-        swprintf_s(m_MutexName, L"Global\\[%s]-ProcessInjector_SharedMemory_Mutex_%s", GUID, baseName);
-        m_hMutex = CreateMutexW(
-            NULL,
-            FALSE,
-            m_MutexName
-        );
-
-        if (!m_hMutex)
-        {
-            Close();
-            return false;
-        }
-
-        return true;
-    }
-
     // 打开已有的共享内存 + 互斥量
     bool Open(const wchar_t* baseName, size_t bufferSize)
     {
@@ -102,14 +53,14 @@ public:
 
         // 1. 打开共享内存（使用唯一名称）
         m_hMapFile = OpenFileMappingW(
-            FILE_MAP_ALL_ACCESS,
+            FILE_MAP_READ,
             FALSE,
             uniqueName.c_str()
         );
         if (!m_hMapFile)
             return false;
 
-        m_pData = static_cast<wchar_t*>(MapViewOfFile(m_hMapFile, FILE_MAP_ALL_ACCESS, 0, 0, bufferSize));
+        m_pData = static_cast<wchar_t*>(MapViewOfFile(m_hMapFile, FILE_MAP_READ, 0, 0, bufferSize));
         if (!m_pData)
         {
             CloseHandle(m_hMapFile);
@@ -304,15 +255,5 @@ public:
     const wchar_t* GetData() const
     {
         return m_pData;
-    }
-
-    // 获取生成的唯一名称（调试用）
-    static std::wstring GetUniqueName(const wchar_t* baseName)
-    {
-        std::wstring uniqueName = L"[";
-        uniqueName += GUID;
-        uniqueName += L"]-";
-        uniqueName += baseName;
-        return uniqueName;
     }
 };
