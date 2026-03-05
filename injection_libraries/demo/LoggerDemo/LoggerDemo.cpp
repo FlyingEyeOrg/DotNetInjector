@@ -5,6 +5,7 @@
 #include "Logger.h"
 #include "injection_parameters.h"
 #include "string_converter.h"
+#include "shared_memory.h"
 
 int main()
 {
@@ -12,6 +13,15 @@ int main()
 	Logger::Initialize();
 	Logger::Log("Hello");
 	std::cout << "hello" << std::endl;
+
+	//SharedMemory mem;
+	//// Global\[b62658dd-18f4-4de3-a09c-53c6c6cbf7d4]-MyFileMappingObject
+	//// Global\[b62658dd-18f4-4de3-a09c-53c6c6cbf7d4]-MyFileMappingObject
+	//if (mem.Open(L"FrameworkVersion", 256))
+	//{
+	//	auto value = mem.Read();
+	//	return 0;
+	//}
 
 	InjectionParameters parameters;
 
