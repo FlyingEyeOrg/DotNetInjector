@@ -142,14 +142,13 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 		Logger::Log("Thread attached to Mono runtime.");
 
 		// 8. 加载程序集
-		const char* assemblyPath = gbkAssemblyFile.c_str();
-		MonoAssembly* assembly = g_mono_domain_assembly_open(domain, assemblyPath);
+		MonoAssembly* assembly = g_mono_domain_assembly_open(domain, gbkAssemblyFile.c_str());
 		if (!assembly)
 		{
-			Logger::Log("Failed to open assembly: %s", assemblyPath);
+			Logger::Log("Failed to open assembly: %s", gbkAssemblyFile.c_str());
 			return FALSE;
 		}
-		Logger::Log("Loaded assembly: %s", assemblyPath);
+		Logger::Log("Loaded assembly: %s", gbkAssemblyFile.c_str());
 
 		// 9. 获取 Image
 		MonoImage* image = g_mono_assembly_get_image(assembly);
