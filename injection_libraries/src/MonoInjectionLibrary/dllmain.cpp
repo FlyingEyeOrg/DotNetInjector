@@ -98,6 +98,24 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 		if (!ValidateParameter(gbkEntryMethod.c_str(), "EntryMethod(GBK)"))
 			return FALSE;
 
+		// 将 wstring 转换为 filesystem::path 以便进行文件验证
+		std::filesystem::path assemblyPath(assemblyFile);
+
+		// 验证程序集文件是否存在且为有效的 DLL 文件
+		if (!std::filesystem::exists(assemblyPath))
+		{
+			Logger::Log("Error: Assembly file does not exist: %s",
+				string_convertor::wstring_to_gbk(assemblyFile).c_str());
+			return FALSE;
+		}
+
+		if (assemblyPath.extension() != L".dll")
+		{
+			Logger::Log("Error: Assembly file is not a DLL: %s",
+				string_convertor::wstring_to_gbk(assemblyFile).c_str());
+			return FALSE;
+		}
+
 		// 5. 记录参数日志
 		Logger::Log("Executing managed method...");
 		Logger::Log("  Assembly: %s", gbkAssemblyFile.c_str());
