@@ -1,5 +1,4 @@
 ﻿using System;
-using System.IO.MemoryMappedFiles;
 using System.Text;
 using System.Threading;
 
@@ -7,15 +6,14 @@ namespace DotNetInjector.Utils
 {
     public class SharedMemWriter : IDisposable
     {
-        private MemoryMappedFile? _mmf;
-        private MemoryMappedViewAccessor? _accessor;
-        private long _size;
+        private ulong _size;
         private string? _name;
         private bool _disposed = false;
         private readonly string AppID = "b62658dd-18f4-4de3-a09c-53c6c6cbf7d4";
+        IntPtr _handle = IntPtr.Zero;
 
-        // 互斥量，与 C++ 命名保持一致
-        private Mutex? _mutex;
+        // 互斥量句柄（使用 P/Invoke 管理）
+        private IntPtr _mutexHandle = IntPtr.Zero;
 
         /// <summary>
         /// 共享内存名称
@@ -25,14 +23,14 @@ namespace DotNetInjector.Utils
         /// <summary>
         /// 共享内存大小（字节）
         /// </summary>
-        public long Size => _size;
+        public ulong Size => _size;
 
         /// <summary>
         /// 创建或打开共享内存
         /// </summary>
         /// <param name="baseName">共享内存名称</param>
         /// <param name="size">共享内存大小（字节）</param>
-        public void Create(string baseName, long size)
+        public void Create(string baseName, ulong size)
         {
             if (string.IsNullOrEmpty(baseName))
                 throw new ArgumentNullException(nameof(baseName), "共享内存名称不能为空。");
@@ -40,33 +38,63 @@ namespace DotNetInjector.Utils
             if (size <= 0)
                 throw new ArgumentOutOfRangeException(nameof(size), "共享内存大小必须大于 0。");
 
-            if (_mmf != null)
-                throw new InvalidOperationException("共享内存已经创建，不能重复创建。");
-
             _name = baseName;
             _size = size;
 
             try
             {
-                // 创建或打开共享内存
-                _mmf = MemoryMappedFile.CreateOrOpen($"[{AppID}]-{baseName}", size, MemoryMappedFileAccess.ReadWrite);
-                // 创建访问器
-                _accessor = _mmf.CreateViewAccessor(0, size, MemoryMappedFileAccess.ReadWrite);
+                // 检查是否有残留句柄，如果有则直接抛出异常
+                if (_handle != IntPtr.Zero)
+                {
+                    throw new InvalidOperationException(
+                        $"共享内存句柄残留，可能存在资源泄漏或未正确释放。请检查之前的 Create/Close 调用。");
+                }
 
-                // 创建命名互斥量，与 C++ 一致
+                // 创建共享内存
+                var code = SharedMemoryLib.CreateEmptyReadOnlySharedMemory(
+                    $"Global\\[{AppID}]-{baseName}",
+                    (uint)size,
+                    out _handle);
+
+                if (code != 0)
+                {
+                    throw new InvalidOperationException(
+                        $"创建共享内存 '{baseName}' 失败。错误码: 0x{code:X8}");
+                }
+
+                if (_handle == IntPtr.Zero)
+                {
+                    throw new InvalidOperationException(
+                        $"创建共享内存 '{baseName}' 失败，句柄为空。");
+                }
+
+                // 创建带 Everyone 权限的全局互斥量（P/Invoke）
                 string mutexName = $"Global\\[{AppID}]-ProcessInjector_SharedMemory_Mutex_{baseName}";
-                _mutex = new Mutex(false, mutexName);
+                code = SharedMemoryLib.CreateGlobalMutexWithEveryoneAccess(mutexName, out _mutexHandle);
+
+                if (code != 0 || _mutexHandle == IntPtr.Zero)
+                {
+                    throw new InvalidOperationException(
+                        $"创建互斥量 '{baseName}' 失败。错误码: 0x{code:X8}");
+                }
             }
             catch (Exception ex)
             {
-                // 发生异常时清理已分配的资源
-                _accessor?.Dispose();
-                _accessor = null;
-                _mmf?.Dispose();
-                _mmf = null;
-                _mutex?.Dispose();
-                _mutex = null;
-                throw new InvalidOperationException($"创建共享内存 '{baseName}' 失败。", ex);
+                // 清理已分配的资源
+                if (_mutexHandle != IntPtr.Zero)
+                {
+                    SharedMemoryLib.CloseMutex(ref _mutexHandle);
+                    _mutexHandle = IntPtr.Zero;
+                }
+
+                if (_handle != IntPtr.Zero)
+                {
+                    SharedMemoryLib.ReleaseSharedMemory(ref _handle);
+                    _handle = IntPtr.Zero;
+                }
+
+                throw new InvalidOperationException(
+                    $"创建共享内存 '{baseName}' 失败。详情: {ex.Message}", ex);
             }
         }
 
@@ -78,34 +106,36 @@ namespace DotNetInjector.Utils
             if (_disposed)
                 throw new ObjectDisposedException(nameof(SharedMemWriter), "共享内存写入器已被释放。");
 
-            if (_accessor == null)
-                throw new InvalidOperationException("共享内存尚未创建，请先调用 Create 方法。");
+            if (_handle == IntPtr.Zero)
+                throw new InvalidOperationException("共享内存句柄无效，请先调用 Create 方法。");
 
             SafeWrite(() =>
             {
+                // 转成 UTF-16 字节数组，并手动添加 \0\0 终止符
+                byte[] bytes;
                 if (string.IsNullOrEmpty(data))
                 {
-                    // 写入宽字符串终止符 \0\0（两个字节）
-                    _accessor.Write(0, (short)0);
-                    return;
+                    // 空字符串只写入 \0\0
+                    bytes = new byte[sizeof(char)]; // 2 字节
                 }
-
-                // 转成 UTF-16 字节数组（不包含 BOM）
-                byte[] bytes = Encoding.Unicode.GetBytes(data);
-                int byteCount = bytes.Length;
-
-                // 检查空间：需要 byteCount + 2 字节（最后的 \0\0）
-                if (byteCount + 2 > _size)
-                    throw new InvalidOperationException("字符串太长，超出共享内存容量。");
-
-                // 写入字符串内容（每个字符 2 字节）
-                for (int i = 0; i < byteCount; i++)
+                else
                 {
-                    _accessor.Write(i, bytes[i]);
+                    // 获取字符串的 UTF-16 字节 + 2 字节终止符
+                    byte[] strBytes = Encoding.Unicode.GetBytes(data);
+                    bytes = new byte[strBytes.Length + sizeof(char)]; // 多留 2 字节给 \0\0
+                    Buffer.BlockCopy(strBytes, 0, bytes, 0, strBytes.Length);
+                    // 最后两个字节默认为 0，即 \0\0
                 }
 
-                // 写入宽字符串终止符 \0\0
-                _accessor.Write(byteCount, (short)0);
+                ulong byteCount = (ulong)bytes.Length;
+
+                // 检查空间
+                if (byteCount > _size)
+                    throw new InvalidOperationException(
+                        $"字符串太长，超出共享内存容量。字符串长度: {byteCount} 字节，可用空间: {_size} 字节。");
+
+                // 一次性写入全部数据（包含终止符）
+                SharedMemoryLib.WriteToSharedMemory(_handle, bytes, (uint)byteCount);
             });
         }
 
@@ -114,17 +144,29 @@ namespace DotNetInjector.Utils
         /// </summary>
         private void SafeWrite(Action writeAction)
         {
-            if (_mutex == null)
-                throw new InvalidOperationException("互斥量未初始化。");
+            if (_mutexHandle == IntPtr.Zero)
+                throw new InvalidOperationException("互斥量句柄无效，可能共享内存创建失败。");
 
-            _mutex.WaitOne();
+            // 等待互斥量（无限等待）
+            var result = SharedMemoryLib.WaitForMutex(_mutexHandle, SharedMemoryLib.INFINITE);
+
+            if (result == SharedMemoryLib.WAIT_ABANDONED)
+            {
+                // 前一个持有者异常退出，但仍获得锁，继续操作
+            }
+            else if (result != SharedMemoryLib.ERROR_SUCCESS)
+            {
+                throw new InvalidOperationException($"等待互斥量失败。错误码: 0x{result:X8}");
+            }
+
             try
             {
                 writeAction();
             }
             finally
             {
-                _mutex.ReleaseMutex();
+                // 释放互斥量
+                SharedMemoryLib.ReleaseMutexHandle(_mutexHandle);
             }
         }
 
@@ -142,17 +184,18 @@ namespace DotNetInjector.Utils
             if (_disposed)
                 return;
 
-            if (disposing)
+            // 释放互斥量句柄
+            if (_mutexHandle != IntPtr.Zero)
             {
-                // 释放托管资源
-                _accessor?.Dispose();
-                _accessor = null;
+                SharedMemoryLib.CloseMutex(ref _mutexHandle);
+                _mutexHandle = IntPtr.Zero;
+            }
 
-                _mmf?.Dispose();
-                _mmf = null;
-
-                _mutex?.Dispose();
-                _mutex = null;
+            // 释放共享内存句柄
+            if (_handle != IntPtr.Zero)
+            {
+                SharedMemoryLib.ReleaseSharedMemory(ref _handle);
+                _handle = IntPtr.Zero;
             }
 
             _disposed = true;
