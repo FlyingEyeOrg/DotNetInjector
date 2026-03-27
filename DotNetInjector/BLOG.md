@@ -1,149 +1,99 @@
-# 把一个 .NET 注入工具修到可交付，我做了什么
+# DotNetInjector：一个 .NET 进程注入工具
 
-这篇文章记录的是一次非常典型、也非常工程化的修复过程：
+本文档按你指定的结构整理：背景、动机、实现原理、支持的目标、使用教程、使用工具与参考文献。适合开发者和研究人员快速上手与二次开发。
 
-一个 WPF 注入工具表面上看是“UI 有点乱、注入有时失败”，但真正拆开以后，会发现它横跨了四条不同技术边界：
+## 1 背景
 
-- WPF / MVVM 前端交互
-- C# 调度层
-- 原生 C++ 注入桥接层
-- `.NET Framework` / `.NET` / `Mono` 三套运行时分发逻辑
+.NET 生态下，调试、运行时修补、插件注入与动态分析等场景经常需要把托管代码注入到正在运行的进程。注入实现跨越托管与本机边界，并受运行时（.NET Framework / .NET Core / Mono）、进程位数与权限策略影响。
 
-如果不按链路逐层验证，这类项目会非常容易陷入“我以为修好了”的假象。
+传统注入需求包括：自动化测试、运行时诊断、功能性补丁、研究/教学示例。为了把这些场景工程化，需要一套稳健的注入工具与明确的验证流程。
 
-## 一、先不要急着改代码，先把失败路径钉死
+## 2 动机
 
-这次最开始暴露出来的是两个表象：
+- 提供一个可重复、可验证的注入链路，覆盖主流 .NET 运行时。 
+- 减少调试成本：让失败可复现、可定位（细化到“未能注入 DLL”/“DLL 注入后入口未被调用”）。
+- 提供可扩展的注入桥，使托管负载能以一致的方式被加载并执行。
 
-- 主窗口显示杂乱，摘要信息和结果区不够清晰
-- 注入经常失败，尤其是运行时切换和跨位数时不稳定
+## 3 实现原理（高层）
 
-真正有价值的动作不是立刻重构，而是先把注入链跑通并复现失败：
+核心思想：把复杂的跨进程交互拆成三层职责——管理端（发起与展示）、注入桥（本机 DLL，驻留目标进程）、托管负载（被执行的 .NET 程序集）。关键实现要点：
 
-1. 用 `InjectionValidationRunner` 分别跑 `framework`、`core`、`mono`
-2. 把失败划分成“注入器没把 DLL 打进去”还是“DLL 进去后托管入口没执行”
-3. 再继续往 native bridge 和 request bridge 两端收窄范围
+- 参数与控制：使用请求文件（request-file）或共享内存传递注入参数，减小运行时依赖。
+- 注入技术：通常通过 `CreateRemoteThread` / `WriteProcessMemory` / `LoadLibrary`（或更高级的 `NtCreateThreadEx`、反射式注入）把注入桥加载到目标进程。
+- 运行时识别：注入桥在目标进程内检测运行时类型和进程位数（优先使用 `IsWow64Process2`），然后选择对应加载策略。
+- .NET Framework：使用 CLR hosting API 或通过在目标进程中直接 `Assembly.Load` 并调用入口。
+- .NET Core/.NET 5+：通过 `nethost`/`hostfxr` 定位并启动 CoreCLR，然后使用 `load_assembly_and_get_function_pointer` 等委托调用托管方法。
+- Mono：使用 Mono embedding API（`mono_jit_init`、`mono_domain_assembly_open`、`mono_runtime_invoke`），并在解析入口时支持带字符串参数和无参回退。
+- 稳定性策略：避免在 `DllMain` 做繁重工作；把实际加载逻辑放到新线程；对文件竞争、锁定、空文件等情况做短重试。
+- 编码一致性：本机<->托管字符串统一使用 UTF-8，避免地区代码页导致的中文乱码问题。
 
-这个顺序很重要，因为“LoadLibraryW 失败”和“进入目标进程后参数没读到”是两种完全不同的问题。
+## 4 支持的目标
 
-## 二、真正的根因通常在桥接层
+- 运行时：`.NET Framework`（传统 CLR）、`.NET Core` / `.NET 5+`（CoreCLR/hostfxr）、`Mono`（Embedding）。
+- 平台：Windows（x86 / x64）为主；注入桥需与目标进程位数匹配。
+- 场景：测试容器、桌面应用、服务进程（需有相应权限）——不适用于未授权或恶意用途。
 
-后来能确定，问题并不是单点，而是一串叠加：
+## 5 使用教程（快速上手）
 
-### 1. 参数桥接太脆弱
+下面以一个常见流程示例说明如何使用 `DotNetInjector`：
 
-注入请求最初依赖单一路径参数文件。只要路径、时序、共享锁任何一个点出问题，目标进程里的桥接 DLL 就拿不到参数。
+1) 克隆并还原仓库
 
-修复方法很直接：
+```powershell
+git clone https://github.com/FlyingEyeOrg/DotNetInjector.git
+cd DotNetInjector/DotNetInjector
+dotnet restore
+```
 
-- 同时发布 PID 定向文件和模块目录兜底文件
-- 原生侧使用 Win32 文件 API 读取
-- 增加轮询窗口，允许短时间共享冲突恢复
+2) 构建托管与测试项目
 
-### 2. `DllMain` 做了太多事
+```powershell
+dotnet build src/DotNetInjector/DotNetInjector.csproj -c Debug
+dotnet build tests/DotNetInjector.SmokeTests/DotNetInjector.SmokeTests.csproj -c Debug
+```
 
-这是注入类项目的高频坑。
+3) 构建原生注入桥（需 MSVC 环境）
 
-只要在 `DllMain` 里做复杂逻辑，就等于在 loader lock 下赌运气。某些进程能过，不代表它是对的。
+```powershell
+msbuild injection_libraries/src/ManagedInjectionLibrary/ManagedInjectionLibrary.vcxproj /p:Configuration=Release /p:Platform=x64
+msbuild injection_libraries/src/ManagedInjectionLibrary/ManagedInjectionLibrary.vcxproj /p:Configuration=Release /p:Platform=Win32
+```
 
-修复方式是把真正的执行逻辑丢到工作线程里，让 `DllMain` 只负责创建线程并快速返回。
+4) 启动目标进程（演示：`demo/CoreInjectionDemo`）并记录 PID
 
-### 3. Mono 路径最容易被忽略
+5) 使用注入工具（参考下一节）把注入桥 DLL 注入到目标进程
 
-很多工具把 `Mono` 支持写上了，但实际上路径里还混着 ANSI/ACP 假设。
+6) 启动 `InjectionValidationRunner` 或使用 `DotNetInjector` 管理端触发注入并观察输出
 
-这次补的两个点很关键：
+示例：假设使用外部注入器 `wininjector`，且注入桥位于 `src/DotNetInjector/Tools/x64/ManagedInjectionLibrary.dll`：
 
-- `Mono` 相关字符串统一改成 UTF-8
-- 查找方法时，除了 `Method(string)`，还兼容同名无参方法回退
+```powershell
+# 在管理员 PowerShell 中运行（视权限需求而定）
+git clone https://github.com/FlyingEyeOrg/wininjector.git
+cd wininjector
+msbuild wininjector.sln /p:Configuration=Release
+.
+\path\to\wininjector\bin\Release\wininjector.exe -pid 1234 -dll "..\DotNetInjector\src\DotNetInjector\Tools\x64\ManagedInjectionLibrary.dll"
+```
 
-这两个改动不花哨，但非常实用，特别是路径里有非 ASCII 字符时。
+注：`wininjector` 的命令行与参数请参考其仓库的 README；该示例仅示意注入流程。
 
-## 三、UI 问题不只是“好不好看”
+## 6 使用工具：`wininjector`
 
-主窗口原来的问题并不只是视觉样式，而是“信息密度没有组织好”：
+仓库： https://github.com/FlyingEyeOrg/wininjector.git
 
-- 进程列表看得到名字，但缺少路径和筛选结果反馈
-- 注入参数填完以后，右侧摘要不足以帮助确认当前上下文
-- 输出区没有明确区分 stdout / stderr
+简介：`wininjector` 是一个用于在 Windows 上注入 DLL 的工具（示例/参考）。推荐流程：
 
-这次 UI 调整的原则不是“重做设计”，而是把关键状态显式化：
+- 从上游仓库拉取并构建 `wininjector`（Visual Studio / msbuild）。
+- 使用 `wininjector` 将注入桥（`ManagedInjectionLibrary.dll`）注入到目标进程的地址空间。
+- 注入桥会读取请求文件并根据参数触发托管负载的加载与执行。
 
-- 显示筛选结果数量
-- 显示目标进程路径
-- 摘要区补上运行时、Framework 版本、入口签名
-- 输出区拆成标准输出和标准错误两个面板
+示意命令已在第五节给出；如果需要，我可以为你生成基于 `wininjector` 的更完整示例脚本，包括自动检测目标 PID、按位数选择 x86/x64 DLL 并执行注入。
 
-这类修改的价值在于，出问题时用户能更快定位“是我填错了，还是程序坏了”。
+## 7 参考文献与延伸阅读
 
-## 四、没有自动化的“修复完成”基本不可信
-
-如果只是手工点几次 UI，然后跑一次 `all`，这类项目很快又会回归。
-
-所以这次我补了两类 smoke tests：
-
-### 1. 运行时分开的 smoke tests
-
-以前是一把跑 `all`。
-
-现在拆成：
-
-- `framework`
-- `core`
-- `mono`
-
-每条路径独立失败、独立报错、独立看 marker，回归定位成本会低很多。
-
-### 2. 主窗口 UI 自动化 smoke test
-
-这一步特别重要。
-
-很多桌面工具的 UI 回归问题，本质上是没有自动化覆盖。我这次补的是最基础但很有效的一种：
-
-- 自动拉起主窗口
-- 找到刷新按钮、搜索框、结果摘要控件
-- 做一次实际输入和按钮调用
-- 确认窗口没有在启动阶段直接崩掉
-
-它不是完整 UI 测试，但足够把“窗口根本打不开”“关键控件树丢了”这类问题提前挡住。
-
-## 五、工程结构的现代化，不等于大重构
-
-很多人说“整理结构”时会直接动大目录迁移，但那通常风险很高。
-
-这次采用的是低风险现代化：
-
-- 增加 `Directory.Build.props`，把 SDK-style C# 项目的公共配置收口
-- 增加 `docs/architecture.md`，把目录职责和注入链说明清楚
-- README 改成“能真的拿来上手”的版本
-- 把临时诊断产物清掉，并加入 `.gitignore`
-
-这比大范围挪目录更现实，也更适合一个还在持续验证的混合 C++ / C# 工程。
-
-## 六、我最看重的不是修了多少，而是验证链闭环了
-
-最后真正让我认为这次工作完成的，不是某一段代码看起来更漂亮，而是下面这条链闭环了：
-
-1. 原生桥接库重编成功
-2. 工具资产同步到 `Tools/x86` 和 `Tools/x64`
-3. 单元测试通过
-4. `framework/core/mono` 分别通过 smoke
-5. 主窗口 UI 自动化 smoke 通过
-
-只要这五步还在，后面继续演进功能就不会完全失控。
-
-## 结语
-
-注入类项目最难的点，从来不是“把代码写出来”，而是把跨层调用、运行时差异、位数差异、调试手段和自动化验证统一起来。
-
-这次修复给我的结论很简单：
-
-- 注入项目必须按链路调试
-- UI 问题必须落到可执行验证上
-- 跨 runtime 的兼容性，不能只靠静态猜测
-- 工程化整理要做低风险、可回归的改进
-
-如果后续还要继续演进，这个项目最值得投资的方向会是两件事：
-
-- 引入更系统的 UI 自动化和回归任务
-- 继续把原生桥接层的错误回传做得更细，让失败不只是一句 HRESULT
+- .NET Hosting APIs / hostfxr（CoreCLR hosting）— 官方文档
+- nethost 与 hostfxr 示例 — dotnet/runtime 仓库
+- Mono Embedding API — Mono 官方文档
+- Windows API：`CreateRemoteThread`、`WriteProcessMemory`、`IsWow64Process2` — Microsoft Docs
+- 注入相关原理与防护：各类安全研究与 MS docs
