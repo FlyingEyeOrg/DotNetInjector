@@ -7,4 +7,9 @@ public sealed record InjectionExecutionResult(
     string StandardError,
     string ToolPath,
     string PayloadPath,
-    TimeSpan Duration);
+    TimeSpan Duration,
+    bool ToolSucceeded,
+    bool ManagedExecutionSucceeded,
+    string ToolExecutionSummary,
+    string ManagedExecutionSummary,
+    string NativeBridgeLog);

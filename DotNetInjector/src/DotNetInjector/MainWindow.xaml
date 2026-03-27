@@ -250,7 +250,7 @@
                                 <TextBox Grid.Column="1"
                                          Style="{StaticResource TextBoxExtend}"
                                          Text="{Binding EntryMethod, UpdateSourceTrigger=PropertyChanged}"
-                                         hc:InfoElement.Placeholder="public static int InjectionMethod(string value)" />
+                                         hc:InfoElement.Placeholder="例如 InjectionMethod；也支持粘贴完整签名" />
                             </Grid>
 
                             <Grid Grid.Row="6" Margin="0,16,0,0">
@@ -281,10 +281,14 @@
                                 <TextBlock Margin="0,6,0,0" Text="{Binding AssemblyPath}" TextWrapping="Wrap" />
                                 <TextBlock Margin="0,18,0,0" Foreground="#516B77" Text="入口方法" />
                                 <TextBlock Margin="0,6,0,0" Text="{Binding EntrySignatureSummary}" TextWrapping="Wrap" />
+                                <TextBlock Margin="0,18,0,0" Foreground="#516B77" Text="DLL 注入状态" />
+                                <TextBlock Margin="0,6,0,0" FontWeight="SemiBold" Text="{Binding LastToolExecutionSummary}" TextWrapping="Wrap" />
+                                <TextBlock Margin="0,18,0,0" Foreground="#516B77" Text="托管入口状态" />
+                                <TextBlock Margin="0,6,0,0" FontWeight="SemiBold" Text="{Binding LastManagedExecutionSummary}" TextWrapping="Wrap" />
                                 <TextBlock Margin="0,18,0,0" Foreground="#516B77" Text="入口签名约束" />
                                 <TextBlock Margin="0,6,0,0"
                                            Foreground="#6B7F89"
-                                           Text="类型不能为嵌套类；入口方法必须为 public static int Method(string value)。"
+                                           Text="类型不能为嵌套类；推荐签名为 public static int Method(string value)。方法栏只需填写方法名。"
                                            TextWrapping="Wrap" />
                                 <Button x:Name="InjectButton"
                                     Margin="0,28,0,0"

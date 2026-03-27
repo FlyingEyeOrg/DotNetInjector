@@ -31,6 +31,8 @@ public partial class MainWindowViewModel : ObservableObject
     private string last_standard_output_ = "标准输出将在这里显示。";
     private string last_standard_error_ = "标准错误将在这里显示。";
     private string last_execution_meta_ = "尚未执行注入。";
+    private string last_tool_execution_summary_ = "尚未执行 DLL 注入。";
+    private string last_managed_execution_summary_ = "尚未执行托管入口。";
     private bool is_busy_;
     private TargetProcessInfo? selected_process_;
     private InjectionRuntimeOption? selected_runtime_option_;
@@ -126,6 +128,18 @@ public partial class MainWindowViewModel : ObservableObject
         set => SetProperty(ref last_execution_meta_, value);
     }
 
+    public string LastToolExecutionSummary
+    {
+        get => last_tool_execution_summary_;
+        set => SetProperty(ref last_tool_execution_summary_, value);
+    }
+
+    public string LastManagedExecutionSummary
+    {
+        get => last_managed_execution_summary_;
+        set => SetProperty(ref last_managed_execution_summary_, value);
+    }
+
     public bool IsBusy
     {
         get => is_busy_;
@@ -165,7 +179,7 @@ public partial class MainWindowViewModel : ObservableObject
         get
         {
             var trimmed_entry_class = EntryClass.Trim();
-            var trimmed_entry_method = EntryMethod.Trim();
+            var trimmed_entry_method = NormalizeEntryMethodName(EntryMethod);
             if (string.IsNullOrWhiteSpace(trimmed_entry_class) || string.IsNullOrWhiteSpace(trimmed_entry_method))
             {
                 return "未填写完整入口签名";
@@ -273,21 +287,27 @@ public partial class MainWindowViewModel : ObservableObject
             LastStandardOutput = string.IsNullOrWhiteSpace(result.StandardOutput)
                 ? "注入器没有输出标准输出。"
                 : result.StandardOutput;
-            LastStandardError = string.IsNullOrWhiteSpace(result.StandardError)
-                ? "注入器没有输出标准错误。"
-                : result.StandardError;
+            LastStandardError = BuildErrorPanelText(result);
             LastExecutionMeta = $"ExitCode={result.ExitCode} | Duration={result.Duration.TotalMilliseconds:F0} ms | Tool={Path.GetFileName(result.ToolPath)}";
+            LastToolExecutionSummary = result.ToolExecutionSummary;
+            LastManagedExecutionSummary = result.ManagedExecutionSummary;
 
             if (result.Succeeded)
             {
-                StatusMessage = "注入成功";
+                StatusMessage = "托管入口执行成功";
                 FooterMessage = $"目标进程 {request.ProcessId} 注入完成。";
                 MessageBox.Success($"注入成功。\n目标进程: {request.ProcessId}\n耗时: {result.Duration.TotalMilliseconds:F0} ms", "成功");
             }
+            else if (result.ToolSucceeded)
+            {
+                StatusMessage = "DLL 注入成功，托管入口失败";
+                FooterMessage = result.ManagedExecutionSummary;
+                MessageBox.Warning($"DLL 已注入，但托管入口未成功执行。\n目标进程: {request.ProcessId}\n详情: {result.ManagedExecutionSummary}", "警告");
+            }
             else
             {
-                StatusMessage = "注入失败";
-                FooterMessage = "注入器返回非零退出码。";
+                StatusMessage = "DLL 注入失败";
+                FooterMessage = result.ToolExecutionSummary;
                 MessageBox.Error($"注入失败。\n退出码: {result.ExitCode}", "失败");
             }
         }
@@ -321,6 +341,12 @@ public partial class MainWindowViewModel : ObservableObject
         }
 
         var runtime = SelectedRuntimeOption?.Kind ?? InjectionRuntimeKind.DotNet;
+        var normalized_entry_method = NormalizeEntryMethodName(EntryMethod);
+
+        if (string.IsNullOrWhiteSpace(normalized_entry_method))
+        {
+            throw new UserFriendlyException("请输入有效的入口方法名称。", details: "请填写方法名，例如 InjectionMethod；如果填入完整签名，程序会自动提取方法名。");
+        }
 
         return new ManagedInjectionRequest(
             processId,
@@ -328,8 +354,62 @@ public partial class MainWindowViewModel : ObservableObject
             FrameworkVersion,
             AssemblyPath.Trim(),
             EntryClass.Trim(),
-            EntryMethod.Trim(),
+            normalized_entry_method,
             EntryMethodArgument);
+    }
+
+    private static string BuildErrorPanelText(InjectionExecutionResult result)
+    {
+        var sections = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(result.StandardError))
+        {
+            sections.Add(result.StandardError);
+        }
+        else
+        {
+            sections.Add("注入器没有输出标准错误。");
+        }
+
+        if (!string.IsNullOrWhiteSpace(result.NativeBridgeLog))
+        {
+            sections.Add("桥接 DLL 日志:\n" + result.NativeBridgeLog);
+        }
+
+        return string.Join("\n\n", sections);
+    }
+
+    private static string NormalizeEntryMethodName(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var method_text = value.Trim();
+
+        var parameter_index = method_text.IndexOf('(');
+        if (parameter_index >= 0)
+        {
+            method_text = method_text[..parameter_index].Trim();
+        }
+
+        var mono_separator_index = method_text.LastIndexOf("::", StringComparison.Ordinal);
+        if (mono_separator_index >= 0)
+        {
+            method_text = method_text[(mono_separator_index + 2)..].Trim();
+        }
+
+        var dot_separator_index = method_text.LastIndexOf('.');
+        if (dot_separator_index >= 0)
+        {
+            method_text = method_text[(dot_separator_index + 1)..].Trim();
+        }
+
+        var whitespace_parts = method_text
+            .Split([' ', '\t', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        return whitespace_parts.Length == 0 ? string.Empty : whitespace_parts[^1];
     }
 
     private void LoadFrameworkVersions()

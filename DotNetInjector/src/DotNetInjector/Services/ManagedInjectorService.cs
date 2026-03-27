@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using DotNetInjector.Exceptions;
 using DotNetInjector.Models;
 using Microsoft.Extensions.Logging;
@@ -10,6 +11,8 @@ public sealed class ManagedInjectorService : IManagedInjectorService
 {
     private static readonly TimeSpan k_execution_timeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan k_request_file_grace_period = TimeSpan.FromMilliseconds(750);
+    private const string k_native_log_directory_name = "[b62658dd-18f4-4de3-a09c-53c6c6cbf7d4]-InjectionLogs";
+    private const string k_native_log_file_name = "injection.log";
 
     private readonly ILogger<ManagedInjectorService> logger_;
 
@@ -47,6 +50,8 @@ public sealed class ManagedInjectorService : IManagedInjectorService
         using var bridge = InjectionRequestFileBridge.Publish(
             request,
             Path.GetDirectoryName(payload_path));
+
+        var native_log_snapshot = CaptureNativeLogSnapshot();
 
         var stopwatch = Stopwatch.StartNew();
         using var timeout_cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -97,7 +102,15 @@ public sealed class ManagedInjectorService : IManagedInjectorService
 
         var standard_output = await output_task;
         var standard_error = await error_task;
+        var native_bridge_log = ReadNativeLogDelta(native_log_snapshot);
         stopwatch.Stop();
+
+        var tool_succeeded = injector_process.ExitCode == 0;
+        var managed_execution_succeeded = tool_succeeded && DetermineManagedExecutionSucceeded(native_bridge_log);
+        var tool_execution_summary = tool_succeeded
+            ? "DLL 注入成功"
+            : $"DLL 注入失败，退出码 {injector_process.ExitCode}";
+        var managed_execution_summary = GetManagedExecutionSummary(tool_succeeded, managed_execution_succeeded, native_bridge_log);
 
         logger_.LogInformation(
             "注入器执行完成: ExitCode={ExitCode}, Duration={Duration}ms",
@@ -105,13 +118,18 @@ public sealed class ManagedInjectorService : IManagedInjectorService
             stopwatch.ElapsedMilliseconds);
 
         return new InjectionExecutionResult(
-            injector_process.ExitCode == 0,
+            tool_succeeded && managed_execution_succeeded,
             injector_process.ExitCode,
             standard_output.Trim(),
             standard_error.Trim(),
             tool_path,
             payload_path,
-            stopwatch.Elapsed);
+            stopwatch.Elapsed,
+            tool_succeeded,
+            managed_execution_succeeded,
+            tool_execution_summary,
+            managed_execution_summary,
+            native_bridge_log.Trim());
     }
 
     private static void ValidateRequest(ManagedInjectionRequest request)
@@ -164,5 +182,78 @@ public sealed class ManagedInjectorService : IManagedInjectorService
         catch
         {
         }
+    }
+
+    private static string GetNativeLogFilePath()
+    {
+        return Path.Combine(Path.GetTempPath(), k_native_log_directory_name, k_native_log_file_name);
+    }
+
+    private static long CaptureNativeLogSnapshot()
+    {
+        var log_file_path = GetNativeLogFilePath();
+        if (!File.Exists(log_file_path))
+        {
+            return 0;
+        }
+
+        return new FileInfo(log_file_path).Length;
+    }
+
+    private static string ReadNativeLogDelta(long snapshotLength)
+    {
+        var log_file_path = GetNativeLogFilePath();
+        if (!File.Exists(log_file_path))
+        {
+            return string.Empty;
+        }
+
+        using var stream = new FileStream(log_file_path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        if (snapshotLength > 0 && snapshotLength <= stream.Length)
+        {
+            stream.Seek(snapshotLength, SeekOrigin.Begin);
+        }
+        else
+        {
+            stream.Seek(0, SeekOrigin.Begin);
+        }
+
+        using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+        return reader.ReadToEnd();
+    }
+
+    private static bool DetermineManagedExecutionSucceeded(string nativeBridgeLog)
+    {
+        if (string.IsNullOrWhiteSpace(nativeBridgeLog))
+        {
+            return false;
+        }
+
+        return nativeBridgeLog.Contains("Framework managed method executed successfully", StringComparison.Ordinal)
+            || nativeBridgeLog.Contains("CoreCLR managed method executed successfully", StringComparison.Ordinal)
+            || nativeBridgeLog.Contains("Mono managed method executed successfully", StringComparison.Ordinal);
+    }
+
+    private static string GetManagedExecutionSummary(bool toolSucceeded, bool managedExecutionSucceeded, string nativeBridgeLog)
+    {
+        if (!toolSucceeded)
+        {
+            return "未进入托管执行阶段";
+        }
+
+        if (managedExecutionSucceeded)
+        {
+            return "托管入口执行成功";
+        }
+
+        if (string.IsNullOrWhiteSpace(nativeBridgeLog))
+        {
+            return "未确认托管入口执行结果";
+        }
+
+        var normalized_log = nativeBridgeLog.Replace("\r", string.Empty, StringComparison.Ordinal).Trim();
+        var log_lines = normalized_log.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var last_log_line = log_lines.Length == 0 ? "桥接层未提供错误细节" : log_lines[^1];
+        return $"托管入口执行失败: {last_log_line}";
     }
 }
