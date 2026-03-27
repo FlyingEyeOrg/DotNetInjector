@@ -1,259 +1,194 @@
 #pragma once
 
 #include <windows.h>
-#include <vector>
-#include <cstdint>
-#include <cstring>
+
+#include <cwchar>
 #include <string>
-#include "pch.h"
 
-// 定义 BYTE 为 unsigned char，便于表示字节
-using BYTE = uint8_t;
+#include "framework.h"
 
-class SharedMemory final
-{
+class SharedMemory final {
 private:
-    HANDLE m_hMapFile = NULL;           // 共享内存句柄
-    wchar_t* m_pData = nullptr;         // 映射的内存指针（字符串）
-    size_t m_BufferSize = 0;             // 共享内存缓冲区总大小
-    size_t m_StringLength = 0;           // 当前存储的字符串长度（含null）
+    static constexpr wchar_t k_guid[] = APP_ID;
 
-    HANDLE m_hMutex = NULL;             // 命名互斥量，用于跨进程同步
-    wchar_t m_MutexName[256] = L"";           // 互斥量名称
+    HANDLE map_file_handle_ = nullptr;
+    wchar_t* data_ = nullptr;
+    size_t buffer_size_bytes_ = 0;
+    size_t string_length_ = 0;
+    HANDLE mutex_handle_ = nullptr;
+    wchar_t mutex_name_[256] = L"";
 
-    // 固定的 GUID，所有进程使用同一个
-    static constexpr wchar_t GUID[] = APP_ID;
+    static std::wstring make_unique_name(const wchar_t* base_name) {
+        std::wstring unique_name = L"Global\\[";
+        unique_name += k_guid;
+        unique_name += L"]-";
+        unique_name += base_name;
+        return unique_name;
+    }
 
-    // 生成带 GUID 前缀的名称
-    static std::wstring MakeUniqueName(const wchar_t* baseName)
-    {
-        std::wstring uniqueName = L"Global\\[";
-        uniqueName += GUID;
-        uniqueName += L"]-";
-        uniqueName += baseName;
-        return uniqueName;
+    size_t buffer_size_chars() const noexcept {
+        return buffer_size_bytes_ / sizeof(wchar_t);
+    }
+
+    bool wait_for_mutex() const noexcept {
+        const DWORD wait_result = ::WaitForSingleObject(mutex_handle_, INFINITE);
+        return wait_result == WAIT_OBJECT_0 || wait_result == WAIT_ABANDONED;
+    }
+
+    void release_mutex() const noexcept {
+        ::ReleaseMutex(mutex_handle_);
     }
 
 public:
     SharedMemory() = default;
 
-    ~SharedMemory()
-    {
-        Close();
+    ~SharedMemory() {
+        close();
     }
 
-    // 打开已有的共享内存 + 互斥量
-    bool Open(const wchar_t* baseName, size_t bufferSize)
-    {
-        // 生成唯一名称（必须与创建时一致）
-        std::wstring uniqueName = MakeUniqueName(baseName);
+    bool open(const wchar_t* base_name, size_t buffer_size_bytes) {
+        const std::wstring unique_name = make_unique_name(base_name);
 
-        m_BufferSize = bufferSize;
-        m_StringLength = 0;
+        buffer_size_bytes_ = buffer_size_bytes;
+        string_length_ = 0;
 
-        // 1. 打开共享内存（使用唯一名称）
-        m_hMapFile = OpenFileMappingW(
-            FILE_MAP_READ,
-            FALSE,
-            uniqueName.c_str()
-        );
-        if (!m_hMapFile)
-            return false;
-
-        m_pData = static_cast<wchar_t*>(MapViewOfFile(m_hMapFile, FILE_MAP_READ, 0, 0, bufferSize));
-        if (!m_pData)
-        {
-            CloseHandle(m_hMapFile);
-            m_hMapFile = NULL;
+        map_file_handle_ = ::OpenFileMappingW(FILE_MAP_READ, FALSE, unique_name.c_str());
+        if (!map_file_handle_) {
             return false;
         }
 
-        // 计算现有字符串长度
-        if (m_pData)
-        {
-            m_StringLength = wcslen(m_pData);
+        data_ = static_cast<wchar_t*>(::MapViewOfFile(map_file_handle_, FILE_MAP_READ, 0, 0, buffer_size_bytes));
+        if (!data_) {
+            ::CloseHandle(map_file_handle_);
+            map_file_handle_ = nullptr;
+            return false;
         }
 
-        // 2. 打开同名互斥量（使用基础名称）
-        swprintf_s(m_MutexName, L"Global\\[%s]-ProcessInjector_SharedMemory_Mutex_%s", GUID, baseName);
-        m_hMutex = OpenMutexW(
-            MUTEX_ALL_ACCESS,
-            FALSE,
-            m_MutexName
-        );
+        string_length_ = wcsnlen_s(data_, buffer_size_chars());
 
-        if (!m_hMutex)
-        {
-            Close();
+        swprintf_s(mutex_name_, L"Global\\[%s]-ProcessInjector_SharedMemory_Mutex_%s", k_guid, base_name);
+        mutex_handle_ = ::OpenMutexW(MUTEX_ALL_ACCESS, FALSE, mutex_name_);
+        if (!mutex_handle_) {
+            close();
             return false;
         }
 
         return true;
     }
 
-    // 关闭所有资源
-    void Close()
-    {
-        if (m_pData)
-        {
-            UnmapViewOfFile(m_pData);
-            m_pData = nullptr;
+    void close() {
+        if (data_) {
+            ::UnmapViewOfFile(data_);
+            data_ = nullptr;
         }
-        if (m_hMapFile)
-        {
-            CloseHandle(m_hMapFile);
-            m_hMapFile = NULL;
+        if (map_file_handle_) {
+            ::CloseHandle(map_file_handle_);
+            map_file_handle_ = nullptr;
         }
-        if (m_hMutex)
-        {
-            CloseHandle(m_hMutex);
-            m_hMutex = NULL;
+        if (mutex_handle_) {
+            ::CloseHandle(mutex_handle_);
+            mutex_handle_ = nullptr;
         }
-        m_BufferSize = 0;
-        m_StringLength = 0;
+        buffer_size_bytes_ = 0;
+        string_length_ = 0;
+        mutex_name_[0] = L'\0';
     }
 
-    // 是否有效
-    bool IsValid() const
-    {
-        return m_pData != nullptr && m_hMutex != NULL;
+    bool is_valid() const noexcept {
+        return data_ != nullptr && mutex_handle_ != nullptr;
     }
 
-    /// @brief 写入宽字符串到共享内存（跨进程安全）
-    /// @param str 要写入的宽字符串
-    /// @return 是否写入成功
-    bool Write(const std::wstring& str)
-    {
-        if (!m_pData || !m_hMutex)
+    bool write(const std::wstring& value) {
+        if (!is_valid()) {
             return false;
+        }
 
-        size_t strLenWithNull = str.length() + 1;  // 包含 null 终止符
-        if (strLenWithNull > m_BufferSize)
-            return false;  // 字符串太长，放不下
-
-        DWORD dwWaitResult = WaitForSingleObject(m_hMutex, INFINITE);
-        if (dwWaitResult != WAIT_OBJECT_0)
+        const size_t value_length_with_null = value.length() + 1;
+        if (value_length_with_null > buffer_size_chars()) {
             return false;
+        }
 
-        // 安全拷贝字符串到共享内存
-        wcscpy_s(m_pData, m_BufferSize / sizeof(wchar_t), str.c_str());
-        m_StringLength = str.length();
+        if (!wait_for_mutex()) {
+            return false;
+        }
 
-        ReleaseMutex(m_hMutex);
+        wcscpy_s(data_, buffer_size_chars(), value.c_str());
+        string_length_ = value.length();
+        release_mutex();
         return true;
     }
 
-    /// @brief 从共享内存读取宽字符串（跨进程安全）
-    /// @param outStr 输出字符串
-    /// @return 是否读取成功
-    bool Read(std::wstring& outStr) const
-    {
-        if (!m_pData || !m_hMutex)
+    bool write(const wchar_t* value) {
+        return value != nullptr && write(std::wstring(value));
+    }
+
+    bool read(std::wstring& output) const {
+        if (!is_valid()) {
             return false;
+        }
 
-        DWORD dwWaitResult = WaitForSingleObject(m_hMutex, INFINITE);
-        if (dwWaitResult != WAIT_OBJECT_0)
+        if (!wait_for_mutex()) {
             return false;
+        }
 
-        // 从共享内存复制字符串
-        outStr = m_pData;  // wstring 构造函数会读取直到 null 终止符
-
-        ReleaseMutex(m_hMutex);
+        output.assign(data_, wcsnlen_s(data_, buffer_size_chars()));
+        release_mutex();
         return true;
     }
 
-    /// @brief 从共享内存读取宽字符串（返回 wstring）
-    /// @return 包含读取数据的字符串（如果失败则返回空字符串）
-    std::wstring Read() const
-    {
-        if (!m_pData || !m_hMutex)
-            return L"";
-
-        DWORD dwWaitResult = WaitForSingleObject(m_hMutex, INFINITE);
-        if (dwWaitResult != WAIT_OBJECT_0)
-            return L"";
-
-        std::wstring result = m_pData;
-
-        ReleaseMutex(m_hMutex);
-        return result;
+    std::wstring read() const {
+        std::wstring value;
+        return read(value) ? value : L"";
     }
 
-    /// @brief 写入 C 风格宽字符串到共享内存
-    /// @param str 要写入的 C 风格宽字符串
-    /// @return 是否写入成功
-    bool Write(const wchar_t* str)
-    {
-        if (!str)
+    bool append(const std::wstring& value) {
+        if (!is_valid() || value.empty()) {
             return false;
-        return Write(std::wstring(str));
-    }
+        }
 
-    /// @brief 追加字符串到共享内存（如果空间足够）
-    /// @param str 要追加的宽字符串
-    /// @return 是否追加成功
-    bool Append(const std::wstring& str)
-    {
-        if (!m_pData || !m_hMutex || str.empty())
+        const size_t new_total_length = string_length_ + value.length();
+        if (new_total_length + 1 > buffer_size_chars()) {
             return false;
+        }
 
-        size_t currentLen = m_StringLength;
-        size_t appendLen = str.length();
-        size_t newTotalLen = currentLen + appendLen;
-
-        if (newTotalLen + 1 > m_BufferSize)  // +1 为 null 终止符
-            return false;  // 空间不足
-
-        DWORD dwWaitResult = WaitForSingleObject(m_hMutex, INFINITE);
-        if (dwWaitResult != WAIT_OBJECT_0)
+        if (!wait_for_mutex()) {
             return false;
+        }
 
-        // 追加字符串
-        wcscat_s(m_pData, m_BufferSize / sizeof(wchar_t), str.c_str());
-        m_StringLength = newTotalLen;
-
-        ReleaseMutex(m_hMutex);
+        wcscat_s(data_, buffer_size_chars(), value.c_str());
+        string_length_ = new_total_length;
+        release_mutex();
         return true;
     }
 
-    // 获取共享内存中字符串的长度（不含 null 终止符）
-    size_t GetStringLength() const
-    {
-        return m_StringLength;
+    size_t get_string_length() const noexcept {
+        return string_length_;
     }
 
-    // 获取共享内存缓冲区总大小（字节）
-    size_t GetBufferSize() const
-    {
-        return m_BufferSize;
+    size_t get_buffer_size() const noexcept {
+        return buffer_size_bytes_;
     }
 
-    // 检查共享内存是否为空
-    bool IsEmpty() const
-    {
-        return m_StringLength == 0;
+    bool is_empty() const noexcept {
+        return string_length_ == 0;
     }
 
-    // 清空共享内存中的字符串
-    bool Clear()
-    {
-        if (!m_pData || !m_hMutex)
+    bool clear() {
+        if (!is_valid()) {
             return false;
+        }
 
-        DWORD dwWaitResult = WaitForSingleObject(m_hMutex, INFINITE);
-        if (dwWaitResult != WAIT_OBJECT_0)
+        if (!wait_for_mutex()) {
             return false;
+        }
 
-        m_pData[0] = L'\0';
-        m_StringLength = 0;
-
-        ReleaseMutex(m_hMutex);
+        data_[0] = L'\0';
+        string_length_ = 0;
+        release_mutex();
         return true;
     }
 
-    // 获取共享内存起始地址（只读，用于直接访问）
-    const wchar_t* GetData() const
-    {
-        return m_pData;
+    const wchar_t* get_data() const noexcept {
+        return data_;
     }
 };

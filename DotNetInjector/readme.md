@@ -14,8 +14,8 @@
 
 ## 程序原理
 
-使用 c++ 编写了一个 windows 进程注入工具 `injector.exe`，`DotNetInjector` 调用 `injector.exe` 对目标 .net 进程进行注入非托管程序集。
-`FrameworkInjectionLibrary` 和 `CoreInjectionLibrary` 以及 `MonoInjectionLibrary` 是三个 C++ 非托管程序集，这三个非托管程序集的作用是将托管的 .NET 程序集注入到 .NET CLR，
+`DotNetInjector` 调用 `WinInjector.exe` 将统一的非托管桥接库 `ManagedInjectionLibrary.dll` 注入目标进程。
+`ManagedInjectionLibrary.dll` 会优先读取共享内存中的运行时提示，并在目标进程内自动分发到 `.NET Framework`、`.NET / .NET Core` 或 `Mono` 的执行路径，
 然后调用约定的入口方法，在托管环境执行自定义的 .NET 代码。
 
 ## 日志
@@ -30,6 +30,16 @@
 * 调用方法名称：入口方法，方法签名必须为 `public static int InjectionMethod(string value)`，否则可能会导致目标进程异常退出，示例：`InjectionMethod`
 * 调用方法参数：传递个 `InjectionMethod` 方法的参数，可为空
 * 目标进程 Id：需要注入的目标进程 ID，必须是 .NET 进程，否则注入失败
+
+## 联调验证
+
+仓库内提供了自动化联调工具：
+
+```powershell
+dotnet run --project .\demo\InjectionValidationRunner\InjectionValidationRunner.csproj -- all
+```
+
+该命令会分别启动 `.NET Framework`、`.NET / .NET Core` 和 `Mono` 目标进程，调用当前 `ManagedInjectorService` 执行真实注入，并校验目标控制台输出。
 
 ## 类库示例
 

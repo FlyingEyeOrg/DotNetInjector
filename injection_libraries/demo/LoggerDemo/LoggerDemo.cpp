@@ -5,13 +5,12 @@
 #include "Logger.h"
 #include "injection_parameters.h"
 #include "string_converter.h"
-#include "shared_memory.h"
 
 int main()
 {
 	std::cout << "hello" << std::endl;
-	Logger::Initialize();
-	Logger::Log("Hello");
+	Logger::initialize();
+	Logger::log("Hello");
 	std::cout << "hello" << std::endl;
 
 	//SharedMemory mem;
@@ -25,17 +24,17 @@ int main()
 
 	InjectionParameters parameters;
 
-	auto isOpen = parameters.Open();
+	auto is_open = parameters.open();
 
-	if (!isOpen)
+	if (!is_open)
 	{
 		std::cout << "open shared memory failed." << std::endl;
 		return 1;
 	}
 
 	std::cout << "parameters: " << std::endl;
-	auto wstr = parameters.GetDebugSummary();
-	auto gbk = ::string_convertor::wstring_to_gbk(wstr);
+	auto wstr = parameters.get_debug_summary();
+	auto gbk = StringConverter::wstring_to_gbk(wstr);
 	std::cout << gbk << std::endl;
 }
 

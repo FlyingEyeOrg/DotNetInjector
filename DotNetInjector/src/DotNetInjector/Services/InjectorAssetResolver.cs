@@ -11,32 +11,14 @@ internal static class InjectorAssetResolver
         var normalizedArchitecture = architecture.Equals("x64", StringComparison.OrdinalIgnoreCase) ? "x64" : "x86";
         var toolDirectory = Path.Combine(baseDirectory, "Tools", normalizedArchitecture);
 
-        var payloadName = ResolvePayloadName(toolDirectory, runtime);
-
         return (
             ResolveToolPath(toolDirectory),
-            Path.Combine(toolDirectory, payloadName));
-    }
-
-    private static string ResolvePayloadName(string toolDirectory, InjectionRuntimeKind runtime)
-    {
-        const string unifiedPayloadName = "ManagedInjectionLibrary.dll";
-        if (File.Exists(Path.Combine(toolDirectory, unifiedPayloadName)))
-        {
-            return unifiedPayloadName;
-        }
-
-        return runtime switch
-        {
-            InjectionRuntimeKind.DotNet => "CoreInjectionLibrary.dll",
-            InjectionRuntimeKind.Mono => "MonoInjectionLibrary.dll",
-            _ => "FrameworkInjectionLibrary.dll",
-        };
+            Path.Combine(toolDirectory, "ManagedInjectionLibrary.dll"));
     }
 
     private static string ResolveToolPath(string toolDirectory)
     {
-        foreach (var candidate in new[] { "WinInjector.exe", "wininjector.exe", "injector.exe" })
+        foreach (var candidate in new[] { "WinInjector.exe", "wininjector.exe" })
         {
             var fullPath = Path.Combine(toolDirectory, candidate);
             if (File.Exists(fullPath))
@@ -45,6 +27,6 @@ internal static class InjectorAssetResolver
             }
         }
 
-        return Path.Combine(toolDirectory, "injector.exe");
+        return Path.Combine(toolDirectory, "WinInjector.exe");
     }
 }

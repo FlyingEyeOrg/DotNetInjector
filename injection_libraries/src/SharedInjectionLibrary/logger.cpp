@@ -1,79 +1,64 @@
 #include "pch.h"
-#include "Logger.h"
+
+#include "logger.h"
+
+#include <chrono>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
-#include <windows.h>
 
-std::wstring Logger::s_LogDir;
-std::wstring Logger::s_LogFile;
-std::mutex Logger::s_LockObj;
+std::wstring Logger::log_dir_;
+std::wstring Logger::log_file_;
+std::mutex Logger::lock_;
+std::once_flag Logger::init_flag_;
 
-std::wstring Logger::GetTempDirectory()
-{
-	wchar_t buffer[MAX_PATH];
-	DWORD len = GetTempPathW(MAX_PATH, buffer);
-	if (len > 0 && len < MAX_PATH)
-	{
-		std::wstring tempPath(buffer);
-		// 移除末尾的反斜杠（如果有）
-		if (!tempPath.empty() && (tempPath.back() == L'\\' || tempPath.back() == L'/'))
-		{
-			tempPath.pop_back();
-		}
-		return tempPath;
-	}
-	// 如果获取失败，返回当前目录作为后备
-	return L".";
+std::wstring Logger::get_temp_directory() {
+    wchar_t buffer[MAX_PATH];
+    const DWORD length = ::GetTempPathW(MAX_PATH, buffer);
+    if (length > 0 && length < MAX_PATH) {
+        std::wstring temp_path(buffer);
+        if (!temp_path.empty() && (temp_path.back() == L'\\' || temp_path.back() == L'/')) {
+            temp_path.pop_back();
+        }
+        return temp_path;
+    }
+
+    return L".";
 }
 
-void Logger::InternalInitialize()
-{
-	s_LogDir = GetTempDirectory() + L"\\" + L"[" + LogID + L"]-InjectionLogs";
-	std::filesystem::create_directories(s_LogDir);
-	s_LogFile = s_LogDir + L"\\injection.log";
+void Logger::internal_initialize() {
+    log_dir_ = get_temp_directory() + L"\\[" + k_log_id + L"]-InjectionLogs";
+    std::filesystem::create_directories(log_dir_);
+    log_file_ = log_dir_ + L"\\injection.log";
 }
 
-std::string Logger::ToUtf8(const std::wstring& wstr)
-{
-	int size = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, NULL, 0, NULL, NULL);
-	std::string result(size, 0);
-	WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, &result[0], size, NULL, NULL);
-	return result;
+std::string Logger::get_timestamp() {
+    const auto now = std::chrono::system_clock::now();
+    const auto time = std::chrono::system_clock::to_time_t(now);
+    const auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(
+        now.time_since_epoch()) % 1000;
+
+    std::tm local_time{};
+    localtime_s(&local_time, &time);
+
+    std::ostringstream stream;
+    stream << std::put_time(&local_time, "%Y-%m-%d %H:%M:%S")
+           << '.' << std::setfill('0') << std::setw(3) << milliseconds.count();
+    return stream.str();
 }
 
-std::string Logger::GetTimestamp()
-{
-	auto now = std::chrono::system_clock::now();
-	auto time = std::chrono::system_clock::to_time_t(now);
-	auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-		now.time_since_epoch()) % 1000;
-
-	std::tm tm;
-	localtime_s(&tm, &time);
-
-	std::ostringstream oss;
-	oss << std::put_time(&tm, "%Y-%m-%d %H:%M:%S")
-		<< '.' << std::setfill('0') << std::setw(3) << ms.count();
-	return oss.str();
+void Logger::initialize() {
+    std::call_once(init_flag_, []() {
+        internal_initialize();
+    });
 }
 
-void Logger::Initialize()
-{
-	static bool initialized = false;
-	if (!initialized)
-	{
-		InternalInitialize();
-		initialized = true;
-	}
-}
+void Logger::log(const std::string& message) {
+    initialize();
 
-void Logger::Log(const std::string& message)
-{
-	std::string logEntry = GetTimestamp() + " - " + message + "\r\n";
+    const std::string log_entry = get_timestamp() + " - " + message + "\r\n";
+    std::lock_guard<std::mutex> lock(lock_);
 
-	std::lock_guard<std::mutex> lock(s_LockObj);
-
-	std::ofstream ofs(ToUtf8(s_LogFile), std::ios::app | std::ios::binary);
-	ofs.write(logEntry.c_str(), static_cast<std::streamsize>(logEntry.length()));
+    std::ofstream output_stream(std::filesystem::path(log_file_), std::ios::app | std::ios::binary);
+    output_stream.write(log_entry.c_str(), static_cast<std::streamsize>(log_entry.length()));
 }

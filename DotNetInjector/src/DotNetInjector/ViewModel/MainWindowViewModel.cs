@@ -47,9 +47,9 @@ public partial class MainWindowViewModel : ObservableObject
 
     public IReadOnlyList<InjectionRuntimeOption> RuntimeOptions { get; } =
     [
-        new(InjectionRuntimeKind.DotNetFramework, ".NET Framework", "使用 FrameworkInjectionLibrary.dll，并写入目标 Framework 版本。"),
-        new(InjectionRuntimeKind.DotNet, ".NET / .NET Core", "使用 CoreInjectionLibrary.dll，对 .NET Core / .NET 进程注入。"),
-        new(InjectionRuntimeKind.Mono, "Mono", "使用 MonoInjectionLibrary.dll，对 Mono 运行时进程注入。"),
+        new(InjectionRuntimeKind.DotNetFramework, ".NET Framework", "使用统一的 ManagedInjectionLibrary.dll，并写入目标 Framework 版本。"),
+        new(InjectionRuntimeKind.DotNet, ".NET / .NET Core", "使用统一的 ManagedInjectionLibrary.dll，对 .NET Core / .NET 进程注入。"),
+        new(InjectionRuntimeKind.Mono, "Mono", "使用统一的 ManagedInjectionLibrary.dll，对 Mono 运行时进程注入。"),
     ];
 
     private List<TargetProcessInfo> all_processes_ = [];

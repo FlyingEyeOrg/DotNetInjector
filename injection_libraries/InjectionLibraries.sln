@@ -5,15 +5,9 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CoreInjectionLibrary", "src\CoreInjectionLibrary\CoreInjectedLibrary.vcxproj", "{B08FA5C1-B8F6-4FF9-AEA6-009EE1AFB799}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "demo", "demo", "{7CA14CC5-6145-44D9-BB09-D9AAFE2E5C34}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TargetClassLibrary", "demo\TargetClassLibrary\TargetClassLibrary.csproj", "{7DFC7480-8A67-45A2-BE64-E8A789769286}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MonoInjectionLibrary", "src\MonoInjectionLibrary\MonoInjectionLibrary.vcxproj", "{FBD757DB-B56F-4D3A-86E7-EAB60E70A97B}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FrameworkInjectionLibrary", "src\FrameworkInjectionLibrary\FrameworkInjectionLibrary.vcxproj", "{01E69BC1-950D-41DA-8A5C-9501E9D8DB02}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ManagedInjectionLibrary", "src\ManagedInjectionLibrary\ManagedInjectionLibrary.vcxproj", "{6CECEB93-5D6C-4D4B-8E2B-5F7FBEA4940D}"
 EndProject
@@ -33,18 +27,6 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{B08FA5C1-B8F6-4FF9-AEA6-009EE1AFB799}.Debug|Any CPU.ActiveCfg = Release|x64
-		{B08FA5C1-B8F6-4FF9-AEA6-009EE1AFB799}.Debug|Any CPU.Build.0 = Release|x64
-		{B08FA5C1-B8F6-4FF9-AEA6-009EE1AFB799}.Debug|x64.ActiveCfg = Debug|x64
-		{B08FA5C1-B8F6-4FF9-AEA6-009EE1AFB799}.Debug|x64.Build.0 = Debug|x64
-		{B08FA5C1-B8F6-4FF9-AEA6-009EE1AFB799}.Debug|x86.ActiveCfg = Debug|Win32
-		{B08FA5C1-B8F6-4FF9-AEA6-009EE1AFB799}.Debug|x86.Build.0 = Debug|Win32
-		{B08FA5C1-B8F6-4FF9-AEA6-009EE1AFB799}.Release|Any CPU.ActiveCfg = Release|x64
-		{B08FA5C1-B8F6-4FF9-AEA6-009EE1AFB799}.Release|Any CPU.Build.0 = Release|x64
-		{B08FA5C1-B8F6-4FF9-AEA6-009EE1AFB799}.Release|x64.ActiveCfg = Release|x64
-		{B08FA5C1-B8F6-4FF9-AEA6-009EE1AFB799}.Release|x64.Build.0 = Release|x64
-		{B08FA5C1-B8F6-4FF9-AEA6-009EE1AFB799}.Release|x86.ActiveCfg = Release|Win32
-		{B08FA5C1-B8F6-4FF9-AEA6-009EE1AFB799}.Release|x86.Build.0 = Release|Win32
 		{7DFC7480-8A67-45A2-BE64-E8A789769286}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{7DFC7480-8A67-45A2-BE64-E8A789769286}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7DFC7480-8A67-45A2-BE64-E8A789769286}.Debug|x64.ActiveCfg = Debug|Any CPU
@@ -57,30 +39,6 @@ Global
 		{7DFC7480-8A67-45A2-BE64-E8A789769286}.Release|x64.Build.0 = Release|Any CPU
 		{7DFC7480-8A67-45A2-BE64-E8A789769286}.Release|x86.ActiveCfg = Release|Any CPU
 		{7DFC7480-8A67-45A2-BE64-E8A789769286}.Release|x86.Build.0 = Release|Any CPU
-		{FBD757DB-B56F-4D3A-86E7-EAB60E70A97B}.Debug|Any CPU.ActiveCfg = Release|x64
-		{FBD757DB-B56F-4D3A-86E7-EAB60E70A97B}.Debug|Any CPU.Build.0 = Release|x64
-		{FBD757DB-B56F-4D3A-86E7-EAB60E70A97B}.Debug|x64.ActiveCfg = Debug|x64
-		{FBD757DB-B56F-4D3A-86E7-EAB60E70A97B}.Debug|x64.Build.0 = Debug|x64
-		{FBD757DB-B56F-4D3A-86E7-EAB60E70A97B}.Debug|x86.ActiveCfg = Debug|Win32
-		{FBD757DB-B56F-4D3A-86E7-EAB60E70A97B}.Debug|x86.Build.0 = Debug|Win32
-		{FBD757DB-B56F-4D3A-86E7-EAB60E70A97B}.Release|Any CPU.ActiveCfg = Release|x64
-		{FBD757DB-B56F-4D3A-86E7-EAB60E70A97B}.Release|Any CPU.Build.0 = Release|x64
-		{FBD757DB-B56F-4D3A-86E7-EAB60E70A97B}.Release|x64.ActiveCfg = Release|x64
-		{FBD757DB-B56F-4D3A-86E7-EAB60E70A97B}.Release|x64.Build.0 = Release|x64
-		{FBD757DB-B56F-4D3A-86E7-EAB60E70A97B}.Release|x86.ActiveCfg = Release|Win32
-		{FBD757DB-B56F-4D3A-86E7-EAB60E70A97B}.Release|x86.Build.0 = Release|Win32
-		{01E69BC1-950D-41DA-8A5C-9501E9D8DB02}.Debug|Any CPU.ActiveCfg = Release|x64
-		{01E69BC1-950D-41DA-8A5C-9501E9D8DB02}.Debug|Any CPU.Build.0 = Release|x64
-		{01E69BC1-950D-41DA-8A5C-9501E9D8DB02}.Debug|x64.ActiveCfg = Debug|x64
-		{01E69BC1-950D-41DA-8A5C-9501E9D8DB02}.Debug|x64.Build.0 = Debug|x64
-		{01E69BC1-950D-41DA-8A5C-9501E9D8DB02}.Debug|x86.ActiveCfg = Debug|Win32
-		{01E69BC1-950D-41DA-8A5C-9501E9D8DB02}.Debug|x86.Build.0 = Debug|Win32
-		{01E69BC1-950D-41DA-8A5C-9501E9D8DB02}.Release|Any CPU.ActiveCfg = Release|x64
-		{01E69BC1-950D-41DA-8A5C-9501E9D8DB02}.Release|Any CPU.Build.0 = Release|x64
-		{01E69BC1-950D-41DA-8A5C-9501E9D8DB02}.Release|x64.ActiveCfg = Release|x64
-		{01E69BC1-950D-41DA-8A5C-9501E9D8DB02}.Release|x64.Build.0 = Release|x64
-		{01E69BC1-950D-41DA-8A5C-9501E9D8DB02}.Release|x86.ActiveCfg = Release|Win32
-		{01E69BC1-950D-41DA-8A5C-9501E9D8DB02}.Release|x86.Build.0 = Release|Win32
 		{6CECEB93-5D6C-4D4B-8E2B-5F7FBEA4940D}.Debug|Any CPU.ActiveCfg = Release|x64
 		{6CECEB93-5D6C-4D4B-8E2B-5F7FBEA4940D}.Debug|Any CPU.Build.0 = Release|x64
 		{6CECEB93-5D6C-4D4B-8E2B-5F7FBEA4940D}.Debug|x64.ActiveCfg = Debug|x64
@@ -122,10 +80,7 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{B08FA5C1-B8F6-4FF9-AEA6-009EE1AFB799} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 		{7DFC7480-8A67-45A2-BE64-E8A789769286} = {7CA14CC5-6145-44D9-BB09-D9AAFE2E5C34}
-		{FBD757DB-B56F-4D3A-86E7-EAB60E70A97B} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
-		{01E69BC1-950D-41DA-8A5C-9501E9D8DB02} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 		{6CECEB93-5D6C-4D4B-8E2B-5F7FBEA4940D} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 		{E2723C73-2A38-4CAE-85EA-CAC072335890} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 		{AC2039D4-30F1-437A-BD6B-6BC64151374D} = {7CA14CC5-6145-44D9-BB09-D9AAFE2E5C34}
@@ -135,12 +90,9 @@ Global
 		SolutionGuid = {5F946ECA-CACC-4FAE-A053-6CA9C375EDCE}
 	EndGlobalSection
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
-		src\SharedInjectionLibrary\SharedInjectionLibrary.vcxitems*{01e69bc1-950d-41da-8a5c-9501e9d8db02}*SharedItemsImports = 4
 		src\SharedInjectionLibrary\SharedInjectionLibrary.vcxitems*{442baa82-5f0f-4f90-b1d6-ab57ee7d92b1}*SharedItemsImports = 4
 		src\SharedInjectionLibrary\SharedInjectionLibrary.vcxitems*{ac2039d4-30f1-437a-bd6b-6bc64151374d}*SharedItemsImports = 4
-		src\SharedInjectionLibrary\SharedInjectionLibrary.vcxitems*{b08fa5c1-b8f6-4ff9-aea6-009ee1afb799}*SharedItemsImports = 4
 		src\SharedInjectionLibrary\SharedInjectionLibrary.vcxitems*{6ceceb93-5d6c-4d4b-8e2b-5f7fbea4940d}*SharedItemsImports = 4
 		src\SharedInjectionLibrary\SharedInjectionLibrary.vcxitems*{e2723c73-2a38-4cae-85ea-cac072335890}*SharedItemsImports = 9
-		src\SharedInjectionLibrary\SharedInjectionLibrary.vcxitems*{fbd757db-b56f-4d3a-86e7-eab60e70a97b}*SharedItemsImports = 4
 	EndGlobalSection
 EndGlobal

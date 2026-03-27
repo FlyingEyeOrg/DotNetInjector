@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Threading;
 
 namespace CoreInjectionDemo
 {
@@ -6,6 +7,9 @@ namespace CoreInjectionDemo
     {
         static void Main(string[] args)
         {
+            var nonInteractive = Array.Exists(args, static arg =>
+                string.Equals(arg, "--non-interactive", StringComparison.OrdinalIgnoreCase));
+
             if (Environment.Is64BitProcess)
             {
                 Console.WriteLine("arc: x64");
@@ -16,8 +20,16 @@ namespace CoreInjectionDemo
             }
 
             Console.WriteLine("process id: " + Process.GetCurrentProcess().Id);
-            Console.WriteLine("enter any ke to exit...");
-            Console.ReadKey();
+
+            if (nonInteractive)
+            {
+                Console.WriteLine("running in non-interactive mode");
+                Thread.Sleep(Timeout.Infinite);
+                return;
+            }
+
+            Console.WriteLine("press enter to exit...");
+            Console.ReadLine();
         }
     }
 }

@@ -1,24 +1,24 @@
 #pragma once
 
-#include <string>
-#include <mutex>
-#include <chrono>
+#include <cstdio>
 #include <filesystem>
-#include "pch.h"
+#include <mutex>
+#include <string>
 
-class Logger final
-{
+#include "framework.h"
+
+class Logger final {
 private:
-    static constexpr const wchar_t* LogID = APP_ID;
+    static constexpr const wchar_t* k_log_id = APP_ID;
 
-    static std::wstring s_LogDir;
-    static std::wstring s_LogFile;
-    static std::mutex s_LockObj;
+    static std::wstring log_dir_;
+    static std::wstring log_file_;
+    static std::mutex lock_;
+    static std::once_flag init_flag_;
 
-    static std::wstring GetTempDirectory();
-    static void InternalInitialize();
-    static std::string ToUtf8(const std::wstring& wstr);
-    static std::string GetTimestamp();
+    static std::wstring get_temp_directory();
+    static void internal_initialize();
+    static std::string get_timestamp();
 
 public:
     Logger() = delete;
@@ -26,14 +26,13 @@ public:
     Logger(const Logger&) = delete;
     Logger& operator=(const Logger&) = delete;
 
-    static void Initialize();
-    static void Log(const std::string& message);
+    static void initialize();
+    static void log(const std::string& message);
 
     template<typename... Args>
-    static void Log(const std::string& format, Args... args)
-    {
+    static void log(const std::string& format, Args... args) {
         char buffer[4096];
-        snprintf(buffer, sizeof(buffer), format.c_str(), args...);
-        Log(std::string(buffer));
+        std::snprintf(buffer, sizeof(buffer), format.c_str(), args...);
+        log(std::string(buffer));
     }
 };

@@ -1,186 +1,117 @@
 #pragma once
 
-#include "shared_memory.h"
 #include <string>
+
+#include "shared_memory.h"
 
 class InjectionParameters {
 public:
-    // 参数配置结构体
     struct Config {
-        size_t maxFrameworkVersionLen = 128;   // 最大框架版本长度
-        size_t maxAssemblyFileLen = 512;       // 最大程序集路径长度
-        size_t maxEntryClassLen = 128;         // 最大入口类名长度
-        size_t maxEntryMethodLen = 128;        // 最大入口方法名长度
-        size_t maxEntryArgLen = 512;           // 最大参数长度
+        size_t max_framework_version_len = 128;
+        size_t max_assembly_file_len = 512;
+        size_t max_entry_class_len = 128;
+        size_t max_entry_method_len = 128;
+        size_t max_entry_arg_len = 512;
     };
 
 private:
-    Config m_Config;
+    Config config_{};
+    SharedMemory framework_version_;
+    SharedMemory assembly_file_;
+    SharedMemory entry_class_;
+    SharedMemory entry_method_;
+    SharedMemory entry_argument_;
 
-    /// <summary>
-    /// .NET Framework 版本（可选）
-    /// 仅在使用 .NET Framework 程序注入时需要
-    /// </summary>
-    SharedMemory m_FrameworkVersion;
-    SharedMemory m_AssemblyFile;
-    SharedMemory m_EntryClass;
-    SharedMemory m_EntryMethod;
-    SharedMemory m_EntryArgument;
-
-    // 内部辅助方法：获取字符串参数
-    std::wstring GetParameter(const SharedMemory& shm) const
-    {
-        if (!shm.IsValid())
-            return L"";
-        return shm.Read();
+    std::wstring get_parameter(const SharedMemory& shared_memory) const {
+        return shared_memory.is_valid() ? shared_memory.read() : L"";
     }
 
 public:
     InjectionParameters() = default;
 
-    ~InjectionParameters()
-    {
-        Close();
+    ~InjectionParameters() {
+        close();
     }
 
-    /// <summary>
-    /// 连接到已存在的共享内存（作为客户端/使用者）
-    /// FrameworkVersion 和 EntryArgument 打开失败会被忽略，因为它们是可选的
-    /// </summary>
-    bool Open(const Config& config = Config())
-    {
-        try
-        {
-            m_Config = config;
+    bool open(const Config& config = Config()) {
+        try {
+            config_ = config;
 
-            // 可选参数：打开失败忽略
-            m_FrameworkVersion.Open(L"FrameworkVersion", sizeof(wchar_t) * m_Config.maxFrameworkVersionLen);
-            m_EntryArgument.Open(L"EntryArgument", sizeof(wchar_t) * m_Config.maxEntryArgLen);
+            framework_version_.open(L"FrameworkVersion", sizeof(wchar_t) * config_.max_framework_version_len);
+            entry_argument_.open(L"EntryArgument", sizeof(wchar_t) * config_.max_entry_arg_len);
 
-            // 必需参数：必须打开成功
-            bool success =
-                m_AssemblyFile.Open(L"AssemblyFile", sizeof(wchar_t) * m_Config.maxAssemblyFileLen) &&
-                m_EntryClass.Open(L"EntryClass", sizeof(wchar_t) * m_Config.maxEntryClassLen) &&
-                m_EntryMethod.Open(L"EntryMethod", sizeof(wchar_t) * m_Config.maxEntryMethodLen);
+            const bool success =
+                assembly_file_.open(L"AssemblyFile", sizeof(wchar_t) * config_.max_assembly_file_len) &&
+                entry_class_.open(L"EntryClass", sizeof(wchar_t) * config_.max_entry_class_len) &&
+                entry_method_.open(L"EntryMethod", sizeof(wchar_t) * config_.max_entry_method_len);
 
-            if (!success)
-            {
-                Close();
+            if (!success) {
+                close();
                 return false;
             }
 
             return true;
-        }
-        catch (...)
-        {
-            Close();
+        } catch (...) {
+            close();
             return false;
         }
     }
 
-    /// <summary>
-    /// 关闭所有共享内存连接
-    /// </summary>
-    void Close()
-    {
-        m_FrameworkVersion.Close();
-        m_AssemblyFile.Close();
-        m_EntryClass.Close();
-        m_EntryMethod.Close();
-        m_EntryArgument.Close();
+    void close() {
+        framework_version_.close();
+        assembly_file_.close();
+        entry_class_.close();
+        entry_method_.close();
+        entry_argument_.close();
     }
 
-    // ============ 参数获取方法 ============
-
-    /// <summary>
-    /// 获取 .NET Framework 版本（可选参数）
-    /// </summary>
-    std::wstring GetFrameworkVersion() const
-    {
-        return GetParameter(m_FrameworkVersion);
+    std::wstring get_framework_version() const {
+        return get_parameter(framework_version_);
     }
 
-    /// <summary>
-    /// 检查是否设置了 Framework 版本
-    /// </summary>
-    bool HasFrameworkVersion() const
-    {
-        return !GetFrameworkVersion().empty();
+    bool has_framework_version() const {
+        return !get_framework_version().empty();
     }
 
-    /// <summary>
-    /// 检查是否设置了入口参数
-    /// </summary>
-    bool HasEntryArgument() const
-    {
-        return !GetEntryArgument().empty();
+    bool has_entry_argument() const {
+        return !get_entry_argument().empty();
     }
 
-    /// <summary>
-    /// 获取程序集文件路径（必需）
-    /// </summary>
-    std::wstring GetAssemblyFile() const
-    {
-        return GetParameter(m_AssemblyFile);
+    std::wstring get_assembly_file() const {
+        return get_parameter(assembly_file_);
     }
 
-    /// <summary>
-    /// 获取入口类名（必需）
-    /// </summary>
-    std::wstring GetEntryClass() const
-    {
-        return GetParameter(m_EntryClass);
+    std::wstring get_entry_class() const {
+        return get_parameter(entry_class_);
     }
 
-    /// <summary>
-    /// 获取入口方法名（必需）
-    /// </summary>
-    std::wstring GetEntryMethod() const
-    {
-        return GetParameter(m_EntryMethod);
+    std::wstring get_entry_method() const {
+        return get_parameter(entry_method_);
     }
 
-    /// <summary>
-    /// 获取入口方法参数（可选）
-    /// </summary>
-    std::wstring GetEntryArgument() const
-    {
-        return GetParameter(m_EntryArgument);
+    std::wstring get_entry_argument() const {
+        return get_parameter(entry_argument_);
     }
 
-    // ============ 状态检查方法 ============
-
-    /// <summary>
-    /// 检查所有必需参数是否已设置
-    /// </summary>
-    bool AreAllRequiredParamsSet() const
-    {
-        return !GetAssemblyFile().empty() &&
-            !GetEntryClass().empty() &&
-            !GetEntryMethod().empty();
+    bool are_all_required_params_set() const {
+        return !get_assembly_file().empty() &&
+            !get_entry_class().empty() &&
+            !get_entry_method().empty();
     }
 
-    /// <summary>
-    /// 检查对象是否有效（只检查必需参数）
-    /// </summary>
-    bool IsValid() const
-    {
-        return m_AssemblyFile.IsValid() &&
-            m_EntryClass.IsValid() &&
-            m_EntryMethod.IsValid();
+    bool is_valid() const {
+        return assembly_file_.is_valid() &&
+            entry_class_.is_valid() &&
+            entry_method_.is_valid();
     }
 
-    /// <summary>
-    /// 获取所有参数的摘要（用于调试）
-    /// </summary>
-    std::wstring GetDebugSummary() const
-    {
+    std::wstring get_debug_summary() const {
         std::wstring summary;
-        summary += L"FrameworkVersion: " + GetFrameworkVersion() + L" (optional)\n";
-        summary += L"AssemblyFile: " + GetAssemblyFile() + L" (required)\n";
-        summary += L"EntryClass: " + GetEntryClass() + L" (required)\n";
-        summary += L"EntryMethod: " + GetEntryMethod() + L" (required)\n";
-        summary += L"EntryArgument: " + GetEntryArgument() + L" (optional)\n";
+        summary += L"FrameworkVersion: " + get_framework_version() + L" (optional)\n";
+        summary += L"AssemblyFile: " + get_assembly_file() + L" (required)\n";
+        summary += L"EntryClass: " + get_entry_class() + L" (required)\n";
+        summary += L"EntryMethod: " + get_entry_method() + L" (required)\n";
+        summary += L"EntryArgument: " + get_entry_argument() + L" (optional)\n";
         return summary;
     }
 };
