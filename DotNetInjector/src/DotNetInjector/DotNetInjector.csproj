@@ -6,7 +6,8 @@
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<UseWPF>true</UseWPF>
-		<Platforms>AnyCPU;x86;x64</Platforms>
+		<Platforms>x64</Platforms>
+		<PlatformTarget>x64</PlatformTarget>
 		<ApplicationManifest>app.manifest</ApplicationManifest>
 	</PropertyGroup>
 
@@ -30,25 +31,6 @@
 		</None>
 		<None Update="Tools\x86\ManagedInjectionLibrary.dll">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-		<None Update="Tools\x86\WinInjector.exe">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</None>
-	</ItemGroup>
-
-	<ItemGroup>
-		<!-- x64 DLLs 放到 win-x64 运行时目录 -->
-		<None Update="Libs\SharedMemoryLib\x64\*.dll" Condition="'$(Platform)' == 'AnyCPU' OR '$(Platform)' == 'x64' OR '$(Platform)' == ''">
-			<Visible>false</Visible>
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-			<Link>%(Filename)%(Extension)</Link>
-		</None>
-
-		<!-- x86 DLLs 放到 win-x86 运行时目录 -->
-		<None Update="Libs\SharedMemoryLib\x86\*.dll" Condition="'$(Platform)' == 'x86'">
-			<Visible>false</Visible>
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-			<Link>%(Filename)%(Extension)</Link>
 		</None>
 	</ItemGroup>
 

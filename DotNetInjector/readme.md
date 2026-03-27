@@ -15,8 +15,15 @@
 ## 程序原理
 
 `DotNetInjector` 调用 `WinInjector.exe` 将统一的非托管桥接库 `ManagedInjectionLibrary.dll` 注入目标进程。
-`ManagedInjectionLibrary.dll` 会优先读取共享内存中的运行时提示，并在目标进程内自动分发到 `.NET Framework`、`.NET / .NET Core` 或 `Mono` 的执行路径，
+`DotNetInjector` 自身只按 `x64` 方式构建；注入阶段始终使用 `Tools\x64\WinInjector.exe`，再根据目标进程位数选择 `x86/x64` 版本的 `ManagedInjectionLibrary.dll`。
+`ManagedInjectionLibrary.dll` 会优先读取按目标进程 PID 生成的请求文件，并在目标进程内自动分发到 `.NET Framework`、`.NET / .NET Core` 或 `Mono` 的执行路径，
 然后调用约定的入口方法，在托管环境执行自定义的 .NET 代码。
+
+这样可以满足：
+
+* `x64 WinInjector` 注入 `x64 .NET` 进程
+* `x64 WinInjector` 通过 `x64loader` 注入 `x86 .NET` 进程
+* `DotNetInjector` 不再依赖固定名称共享内存，避免多次注入或并发注入时发生串扰
 
 ## 日志
 
@@ -40,6 +47,20 @@ dotnet run --project .\demo\InjectionValidationRunner\InjectionValidationRunner.
 ```
 
 该命令会分别启动 `.NET Framework`、`.NET / .NET Core` 和 `Mono` 目标进程，调用当前 `ManagedInjectorService` 执行真实注入，并校验目标控制台输出。
+
+## 测试
+
+单元测试：
+
+```powershell
+dotnet test .\tests\DotNetInjector.Tests\DotNetInjector.Tests.csproj -c Release
+```
+
+冒烟测试：
+
+```powershell
+dotnet test .\tests\DotNetInjector.SmokeTests\DotNetInjector.SmokeTests.csproj -c Release
+```
 
 ## 类库示例
 

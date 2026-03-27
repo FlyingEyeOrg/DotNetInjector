@@ -43,8 +43,7 @@ public sealed class ManagedInjectorService : IManagedInjectorService
             throw new UserFriendlyException($"桥接注入库不存在：{payload_path}");
         }
 
-        using var bridge = new SharedMemoryInjectionBridge();
-        bridge.Publish(request);
+        using var bridge = InjectionRequestFileBridge.Publish(request);
 
         var stopwatch = Stopwatch.StartNew();
         using var timeout_cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -61,7 +60,13 @@ public sealed class ManagedInjectorService : IManagedInjectorService
             WorkingDirectory = Path.GetDirectoryName(tool_path) ?? AppContext.BaseDirectory,
         };
 
-        logger_.LogInformation("启动注入器: {ToolPath} {Arguments}", process_info.FileName, process_info.Arguments);
+        logger_.LogInformation(
+            "启动注入器: Tool={ToolPath}, Payload={PayloadPath}, TargetArch={TargetArchitecture}, RequestFile={RequestFilePath}, Args={Arguments}",
+            process_info.FileName,
+            payload_path,
+            architecture,
+            bridge.RequestFilePath,
+            process_info.Arguments);
 
         using var injector_process = Process.Start(process_info);
         if (injector_process is null)

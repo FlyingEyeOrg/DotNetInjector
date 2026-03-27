@@ -233,7 +233,7 @@ public partial class MainWindowViewModel : ObservableObject
         {
             IsBusy = true;
             StatusMessage = "注入执行中";
-            FooterMessage = "共享内存已准备，正在启动外部注入器。";
+            FooterMessage = "请求文件已准备，正在启动外部注入器。";
             LastStandardOutput = "等待注入器输出...";
             LastStandardError = "等待注入器错误输出...";
 

@@ -7,13 +7,18 @@ internal static class InjectorAssetResolver
 {
     public static (string ToolPath, string PayloadPath) Resolve(InjectionRuntimeKind runtime, string architecture)
     {
-        var baseDirectory = AppContext.BaseDirectory;
+        return Resolve(runtime, architecture, AppContext.BaseDirectory);
+    }
+
+    internal static (string ToolPath, string PayloadPath) Resolve(InjectionRuntimeKind runtime, string architecture, string baseDirectory)
+    {
         var normalizedArchitecture = architecture.Equals("x64", StringComparison.OrdinalIgnoreCase) ? "x64" : "x86";
-        var toolDirectory = Path.Combine(baseDirectory, "Tools", normalizedArchitecture);
+        var toolDirectory = Path.Combine(baseDirectory, "Tools", "x64");
+        var payloadDirectory = Path.Combine(baseDirectory, "Tools", normalizedArchitecture);
 
         return (
             ResolveToolPath(toolDirectory),
-            Path.Combine(toolDirectory, "ManagedInjectionLibrary.dll"));
+            Path.Combine(payloadDirectory, "ManagedInjectionLibrary.dll"));
     }
 
     private static string ResolveToolPath(string toolDirectory)
