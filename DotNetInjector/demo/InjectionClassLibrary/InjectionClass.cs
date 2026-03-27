@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Reflection;
 
 namespace InjectionClassLibrary
@@ -7,6 +8,17 @@ namespace InjectionClassLibrary
     {
         public static int InjectionMethod(string value)
         {
+            Console.WriteLine(Process.GetCurrentProcess().Id);
+            AppDomain.CurrentDomain.FirstChanceException += (s, e) =>
+            {
+                Console.WriteLine("[FirstChance] " + e.Exception.Message);
+            };
+
+            AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+            {
+                Console.WriteLine("[Unhandled] " + (e.ExceptionObject as Exception)?.Message);
+            };
+
             Console.WriteLine("print value: " + value);
             Console.WriteLine("方法强制调用成功");
 

@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using DotNetInjector.Services;
 using DotNetInjector.ViewModel;
 
 namespace DotNetInjector
@@ -13,8 +14,15 @@ namespace DotNetInjector
         {
             base.Load(builder);
 
+            builder.RegisterType<ProcessCatalogService>()
+                .As<IProcessCatalogService>()
+                .SingleInstance();
+            builder.RegisterType<ManagedInjectorService>()
+                .As<IManagedInjectorService>()
+                .SingleInstance();
             builder.RegisterType<MainWindowViewModel>()
-               .AsSelf();
+               .AsSelf()
+               .SingleInstance();
             builder.RegisterType<MainWindow>()
                 .AsSelf()
                 .OnActivated(e => e.Instance.DataContext = e.Context.Resolve<MainWindowViewModel>());

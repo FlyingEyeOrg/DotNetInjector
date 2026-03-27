@@ -3,7 +3,6 @@ using Autofac.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Serilog;
 using System.Windows;
 
@@ -14,9 +13,12 @@ namespace DotNetInjector
     /// </summary>
     public partial class App : Application
     {
+        private IHost? host_;
+
         public App()
         {
             Startup += App_Startup;
+            Exit += App_Exit;
         }
 
         private void App_Startup(object sender, StartupEventArgs e)
@@ -42,13 +44,17 @@ namespace DotNetInjector
             Log.Information("应用程序启动！");
 
 #if RELEASE
-    var environmentName = Environments.Production;
+            var environmentName = Environments.Production;
 #else
             var environmentName = Environments.Development;
 #endif
 
             // 2. 创建 HostBuilder
-            var builder = Host.CreateApplicationBuilder();
+            var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
+            {
+                ContentRootPath = AppContext.BaseDirectory,
+                EnvironmentName = environmentName,
+            });
 
             // 3. 先配置 Serilog（关键：必须在 Build 之前）
             builder.Services.AddSerilog();
@@ -66,12 +72,25 @@ namespace DotNetInjector
                 .AddEnvironmentVariables();
 
             // 6. 构建并启动 Host
-            var host = builder.Build();
-            host.Start();
+            host_ = builder.Build();
+            host_.Start();
 
-            var mainWindow = host.Services.GetRequiredService<MainWindow>();
+            var mainWindow = host_.Services.GetRequiredService<MainWindow>();
             mainWindow.Show();
-            this.MainWindow = mainWindow;
+            MainWindow = mainWindow;
+        }
+
+        private void App_Exit(object sender, ExitEventArgs e)
+        {
+            if (host_ is null)
+            {
+                Log.CloseAndFlush();
+                return;
+            }
+
+            host_.StopAsync().GetAwaiter().GetResult();
+            host_.Dispose();
+            Log.CloseAndFlush();
         }
     }
 }

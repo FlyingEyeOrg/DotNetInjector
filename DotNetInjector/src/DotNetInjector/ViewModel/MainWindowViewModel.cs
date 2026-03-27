@@ -1,487 +1,394 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+﻿using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Globalization;
+using System.IO;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using DotNetInjector.Utils;
+using DotNetInjector.Exceptions;
+using DotNetInjector.Models;
+using DotNetInjector.Services;
+using HandyControl.Controls;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
-using System.Diagnostics;
-using System.IO;
-using System.Runtime.InteropServices;
-using System.Windows;
-using System.Windows.Input;
 
-namespace DotNetInjector.ViewModel
+namespace DotNetInjector.ViewModel;
+
+public partial class MainWindowViewModel : ObservableObject
 {
-    public class MainWindowViewModel : ObservableObject
+    private readonly IProcessCatalogService process_catalog_service_;
+    private readonly IManagedInjectorService managed_injector_service_;
+    private readonly ILogger<MainWindowViewModel> logger_;
+
+    private string process_search_text_ = string.Empty;
+    private string target_process_id_text_ = string.Empty;
+    private string framework_version_ = string.Empty;
+    private string assembly_path_ = string.Empty;
+    private string entry_class_ = string.Empty;
+    private string entry_method_ = string.Empty;
+    private string entry_method_argument_ = string.Empty;
+    private string status_message_ = "就绪";
+    private string footer_message_ = "请选择目标进程并填写注入参数。";
+    private string last_standard_output_ = "标准输出将在这里显示。";
+    private string last_standard_error_ = "标准错误将在这里显示。";
+    private string last_execution_meta_ = "尚未执行注入。";
+    private bool is_busy_;
+    private TargetProcessInfo? selected_process_;
+    private InjectionRuntimeOption? selected_runtime_option_;
+
+    public ObservableCollection<TargetProcessInfo> FilteredProcesses { get; } = new();
+
+    public ObservableCollection<string> FrameworkVersionList { get; } = new();
+
+    public IAsyncRelayCommand RefreshProcessesCommand { get; }
+
+    public IRelayCommand BrowseAssemblyCommand { get; }
+
+    public IAsyncRelayCommand InjectAsyncCommand { get; }
+
+    public IReadOnlyList<InjectionRuntimeOption> RuntimeOptions { get; } =
+    [
+        new(InjectionRuntimeKind.DotNetFramework, ".NET Framework", "使用 FrameworkInjectionLibrary.dll，并写入目标 Framework 版本。"),
+        new(InjectionRuntimeKind.DotNet, ".NET / .NET Core", "使用 CoreInjectionLibrary.dll，对 .NET Core / .NET 进程注入。"),
+        new(InjectionRuntimeKind.Mono, "Mono", "使用 MonoInjectionLibrary.dll，对 Mono 运行时进程注入。"),
+    ];
+
+    private List<TargetProcessInfo> all_processes_ = [];
+
+    public string ProcessSearchText
     {
-        #region 命令
+        get => process_search_text_;
+        set => SetProperty(ref process_search_text_, value);
+    }
 
-        public ICommand SelectFileCommand { get; }
+    public string TargetProcessIdText
+    {
+        get => target_process_id_text_;
+        set => SetProperty(ref target_process_id_text_, value);
+    }
 
-        public ICommand InjectCommand { get; }
+    public string FrameworkVersion
+    {
+        get => framework_version_;
+        set => SetProperty(ref framework_version_, value);
+    }
 
-        #endregion
+    public string AssemblyPath
+    {
+        get => assembly_path_;
+        set => SetProperty(ref assembly_path_, value);
+    }
 
-        #region 需要属性通知的属性
+    public string EntryClass
+    {
+        get => entry_class_;
+        set => SetProperty(ref entry_class_, value);
+    }
 
-        private string? _assemblyPath;
+    public string EntryMethod
+    {
+        get => entry_method_;
+        set => SetProperty(ref entry_method_, value);
+    }
 
-        /// <summary>
-        /// 程序集文件路径（仅限 .dll 文件）
-        /// </summary>
-        public string? AssemblyPath
+    public string EntryMethodArgument
+    {
+        get => entry_method_argument_;
+        set => SetProperty(ref entry_method_argument_, value);
+    }
+
+    public string StatusMessage
+    {
+        get => status_message_;
+        set => SetProperty(ref status_message_, value);
+    }
+
+    public string FooterMessage
+    {
+        get => footer_message_;
+        set => SetProperty(ref footer_message_, value);
+    }
+
+    public string LastStandardOutput
+    {
+        get => last_standard_output_;
+        set => SetProperty(ref last_standard_output_, value);
+    }
+
+    public string LastStandardError
+    {
+        get => last_standard_error_;
+        set => SetProperty(ref last_standard_error_, value);
+    }
+
+    public string LastExecutionMeta
+    {
+        get => last_execution_meta_;
+        set => SetProperty(ref last_execution_meta_, value);
+    }
+
+    public bool IsBusy
+    {
+        get => is_busy_;
+        set => SetProperty(ref is_busy_, value);
+    }
+
+    public TargetProcessInfo? SelectedProcess
+    {
+        get => selected_process_;
+        set => SetProperty(ref selected_process_, value);
+    }
+
+    public InjectionRuntimeOption? SelectedRuntimeOption
+    {
+        get => selected_runtime_option_;
+        set => SetProperty(ref selected_runtime_option_, value);
+    }
+
+    public bool IsFrameworkVersionEnabled => SelectedRuntimeOption?.Kind == InjectionRuntimeKind.DotNetFramework;
+
+    public string SelectedRuntimeDescription => SelectedRuntimeOption?.Description ?? "未选择运行时";
+
+    public string SelectedProcessSummary => SelectedProcess is null
+        ? string.IsNullOrWhiteSpace(TargetProcessIdText) ? "未选择进程" : $"手工输入 PID: {TargetProcessIdText}"
+        : $"{SelectedProcess.ProcessName} ({SelectedProcess.ProcessId}) / {SelectedProcess.Architecture}";
+
+    public MainWindowViewModel(
+        IProcessCatalogService processCatalogService,
+        IManagedInjectorService managedInjectorService,
+        ILogger<MainWindowViewModel> logger)
+    {
+        process_catalog_service_ = processCatalogService;
+        managed_injector_service_ = managedInjectorService;
+        logger_ = logger;
+
+        RefreshProcessesCommand = new AsyncRelayCommand(RefreshProcessesAsync);
+        BrowseAssemblyCommand = new RelayCommand(BrowseAssembly);
+        InjectAsyncCommand = new AsyncRelayCommand(InjectAsync);
+
+        SelectedRuntimeOption = RuntimeOptions[1];
+        PropertyChanged += HandlePropertyChanged;
+        LoadFrameworkVersions();
+        _ = RefreshProcessesAsync();
+    }
+
+    private async Task RefreshProcessesAsync()
+    {
+        if (IsBusy)
         {
-            get => _assemblyPath;
-            set => SetProperty(ref _assemblyPath, value);
+            return;
         }
 
-        #endregion
-
-        #region 不需要属性通知的属性（普通自动属性）
-
-        /// <summary>
-        /// 选择的 .NET Framework 版本
-        /// </summary>
-        public string? FrameworkVersion { get; set; }
-
-        /// <summary>
-        /// 入口类名
-        /// </summary>
-        public string? EntryClass { get; set; }
-
-        /// <summary>
-        /// 入口方法名
-        /// </summary>
-        public string? EntryMethod { get; set; }
-
-        /// <summary>
-        /// 入口方法参数
-        /// </summary>
-        public string? EntryMethodArgument { get; set; }
-
-        /// <summary>
-        ///  目标进程 id
-        /// </summary>
-        public int? ProcessId { get; set; }
-
-        /// <summary>
-        /// .NET Framework 版本列表
-        /// </summary>
-        public List<string> FrameworkVersionList { get; } = new List<string> { ".NetCore", "Mono" };
-        #endregion
-
-        #region 私有字段
-
-        private readonly SharedMemWriter _frameworkVersionMem;
-        private readonly SharedMemWriter _assemblyPathMem;
-        private readonly SharedMemWriter _entryClassMem;
-        private readonly SharedMemWriter _entryMethodMem;
-        private readonly SharedMemWriter _entryMethodArgumentMem;
-
-        private readonly ILogger<MainWindowViewModel> _logger;
-
-        #endregion
-
-        #region 构造函数
-
-        public MainWindowViewModel(ILogger<MainWindowViewModel> logger)
+        try
         {
-            _logger = logger;
+            IsBusy = true;
+            StatusMessage = "刷新进程中";
+            FooterMessage = "正在从系统枚举进程列表。";
 
-            // 初始化共享内存写入器
-            _frameworkVersionMem = new SharedMemWriter();
-            _assemblyPathMem = new SharedMemWriter();
-            _entryClassMem = new SharedMemWriter();
-            _entryMethodMem = new SharedMemWriter();
-            _entryMethodArgumentMem = new SharedMemWriter();
+            all_processes_ = (await process_catalog_service_.GetProcessesAsync()).ToList();
+            ApplyProcessFilter();
 
-            // 初始化共享内存
-            InitializeSharedMemory();
+            StatusMessage = "进程列表已更新";
+            FooterMessage = $"已加载 {all_processes_.Count} 个进程。";
+        }
+        catch (Exception ex)
+        {
+            logger_.LogError(ex, "刷新进程列表失败。");
+            StatusMessage = "进程刷新失败";
+            FooterMessage = "无法读取进程列表。";
+            MessageBox.Error($"刷新进程列表失败：{ex.Message}", "错误");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
 
-            // 加载框架版本列表
-            LoadFrameworkVersions();
+    private void BrowseAssembly()
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "选择托管程序集",
+            Filter = "程序集文件 (*.dll)|*.dll|所有文件 (*.*)|*.*",
+            FilterIndex = 1,
+            Multiselect = false,
+            CheckFileExists = true,
+            CheckPathExists = true,
+        };
 
-            // 初始化命令
-            SelectFileCommand = new RelayCommand(SelectFile);
-            InjectCommand = new RelayCommand(Inject);
+        if (dialog.ShowDialog() == true)
+        {
+            AssemblyPath = dialog.FileName;
+            FooterMessage = $"已选择程序集：{Path.GetFileName(dialog.FileName)}";
+        }
+    }
 
-            _logger.LogInformation("MainWindowViewModel 初始化完成。");
+    private async Task InjectAsync()
+    {
+        if (IsBusy)
+        {
+            return;
         }
 
-        #endregion
-
-        #region 私有方法
-
-        /// <summary>
-        /// 初始化共享内存
-        /// </summary>
-        private void InitializeSharedMemory()
+        try
         {
-            try
-            {
-                _frameworkVersionMem.Create("FrameworkVersion", 128 * 2);
-                _assemblyPathMem.Create("AssemblyFile", 256 * 2);
-                _entryClassMem.Create("EntryClass", 128 * 2);
-                _entryMethodMem.Create("EntryMethod", 128 * 2);
-                _entryMethodArgumentMem.Create("EntryArgument", 256 * 2);
+            IsBusy = true;
+            StatusMessage = "注入执行中";
+            FooterMessage = "共享内存已准备，正在启动外部注入器。";
+            LastStandardOutput = "等待注入器输出...";
+            LastStandardError = "等待注入器错误输出...";
 
-                _logger.LogInformation("共享内存初始化成功。");
-            }
-            catch (Exception ex)
+            var request = BuildRequest();
+            var result = await managed_injector_service_.ExecuteAsync(request);
+
+            LastStandardOutput = string.IsNullOrWhiteSpace(result.StandardOutput)
+                ? "注入器没有输出标准输出。"
+                : result.StandardOutput;
+            LastStandardError = string.IsNullOrWhiteSpace(result.StandardError)
+                ? "注入器没有输出标准错误。"
+                : result.StandardError;
+            LastExecutionMeta = $"ExitCode={result.ExitCode} | Duration={result.Duration.TotalMilliseconds:F0} ms | Tool={Path.GetFileName(result.ToolPath)}";
+
+            if (result.Succeeded)
             {
-                _logger.LogError(ex, "初始化共享内存失败。");
-                MessageBox.Show(
-                    "初始化共享内存失败，请检查权限或共享内存是否被占用。",
-                    "错误",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                StatusMessage = "注入成功";
+                FooterMessage = $"目标进程 {request.ProcessId} 注入完成。";
+                MessageBox.Success($"注入成功。\n目标进程: {request.ProcessId}\n耗时: {result.Duration.TotalMilliseconds:F0} ms", "成功");
+            }
+            else
+            {
+                StatusMessage = "注入失败";
+                FooterMessage = "注入器返回非零退出码。";
+                MessageBox.Error($"注入失败。\n退出码: {result.ExitCode}", "失败");
             }
         }
-
-        /// <summary>
-        /// 加载 .NET Framework 版本列表
-        /// </summary>
-        private void LoadFrameworkVersions()
+        catch (UserFriendlyException ex)
         {
-            try
-            {
-                var versions = GetFrameworkVersionList();
-                FrameworkVersionList.InsertRange(0, versions);
-                _logger.LogInformation("已加载 {Count} 个框架版本。", FrameworkVersionList.Count);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "加载框架版本列表失败。");
-                // 失败时使用默认列表，不提示用户
-            }
+            logger_.LogWarning(ex, "注入请求被拒绝。");
+            StatusMessage = "输入校验失败";
+            FooterMessage = ex.Message;
+            LastStandardError = string.IsNullOrWhiteSpace(ex.Details) ? ex.Message : $"{ex.Message}\n{ex.Details}";
+            MessageBox.Warning(LastStandardError, "提示");
+        }
+        catch (Exception ex)
+        {
+            logger_.LogError(ex, "注入过程中发生未处理错误。");
+            StatusMessage = "注入异常";
+            FooterMessage = "执行期间发生异常。";
+            LastStandardError = ex.ToString();
+            MessageBox.Error(ex.Message, "错误");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private ManagedInjectionRequest BuildRequest()
+    {
+        if (!int.TryParse(TargetProcessIdText, NumberStyles.None, CultureInfo.InvariantCulture, out var processId) || processId <= 0)
+        {
+            throw new UserFriendlyException("请输入有效的目标进程 ID。");
         }
 
-        /// <summary>
-        /// 获取系统中已安装的 .NET Framework 版本
-        /// </summary>
-        private List<string> GetFrameworkVersionList()
+        var runtime = SelectedRuntimeOption?.Kind ?? InjectionRuntimeKind.DotNet;
+
+        return new ManagedInjectionRequest(
+            processId,
+            runtime,
+            FrameworkVersion,
+            AssemblyPath.Trim(),
+            EntryClass.Trim(),
+            EntryMethod.Trim(),
+            EntryMethodArgument);
+    }
+
+    private void LoadFrameworkVersions()
+    {
+        FrameworkVersionList.Clear();
+
+        foreach (var version in GetFrameworkVersions())
         {
-            var versions = new List<string>();
-
-            var windowsFolder = Environment.GetEnvironmentVariable("windir");
-
-            if (string.IsNullOrWhiteSpace(windowsFolder))
-            {
-                return versions;
-            }
-
-            var frameworkDir = Path.Combine(windowsFolder, "Microsoft.NET\\Framework");
-
-            if (!Directory.Exists(frameworkDir))
-            {
-                return versions;
-            }
-
-            var dirInfo = new DirectoryInfo(frameworkDir);
-
-            return dirInfo.GetDirectories()
-                .Where(item => item.Name.StartsWith("v", StringComparison.OrdinalIgnoreCase))
-                .Select(item => item.Name)
-                .ToList();
+            FrameworkVersionList.Add(version);
         }
 
-        /// <summary>
-        /// 打开文件对话框选择 .dll 文件
-        /// </summary>
-        private void SelectFile()
+        if (FrameworkVersionList.Count == 0)
         {
-            try
-            {
-                var dialog = new OpenFileDialog
-                {
-                    Title = "选择 .NET 程序集文件",
-                    Filter = "程序集文件 (*.dll)|*.dll|所有文件 (*.*)|*.*",
-                    FilterIndex = 1,
-                    Multiselect = false,
-                    CheckFileExists = true,
-                    CheckPathExists = true
-                };
+            FrameworkVersionList.Add("v4.0.30319");
+        }
+    }
 
-                var result = dialog.ShowDialog();
+    private void ApplyProcessFilter()
+    {
+        FilteredProcesses.Clear();
 
-                if (result == true && !string.IsNullOrWhiteSpace(dialog.FileName))
-                {
-                    // 二次验证文件扩展名
-                    if (!string.Equals(Path.GetExtension(dialog.FileName), ".dll", StringComparison.OrdinalIgnoreCase))
-                    {
-                        MessageBox.Show(
-                            "请选择 .dll 文件。",
-                            "文件类型错误",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Warning);
-                        return;
-                    }
-
-                    AssemblyPath = dialog.FileName;
-                    _logger.LogInformation("已选择程序集文件: {Path}", dialog.FileName);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "打开文件对话框失败。");
-                MessageBox.Show(
-                    "打开文件对话框失败，请检查系统文件对话框是否正常。",
-                    "错误",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
+        IEnumerable<TargetProcessInfo> query = all_processes_;
+        if (!string.IsNullOrWhiteSpace(ProcessSearchText))
+        {
+            query = query.Where(item =>
+                item.ProcessName.Contains(ProcessSearchText, StringComparison.OrdinalIgnoreCase)
+                || item.ProcessId.ToString(CultureInfo.InvariantCulture).Contains(ProcessSearchText, StringComparison.OrdinalIgnoreCase)
+                || item.MainWindowTitle.Contains(ProcessSearchText, StringComparison.OrdinalIgnoreCase));
         }
 
-        /// <summary>
-        /// 保存数据到共享内存，然后注入目标进程
-        /// </summary>
-        private void Inject()
+        foreach (var item in query)
         {
-            try
-            {
-                // 验证必填参数
-                if (string.IsNullOrWhiteSpace(AssemblyPath))
-                {
-                    MessageBox.Show(
-                        "请选择程序集文件。",
-                        "参数缺失",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
-                    return;
-                }
+            FilteredProcesses.Add(item);
+        }
+    }
 
-                if (string.IsNullOrWhiteSpace(EntryClass))
-                {
-                    MessageBox.Show(
-                        "请输入入口类名。",
-                        "参数缺失",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
-                    return;
-                }
-
-                if (string.IsNullOrWhiteSpace(EntryMethod))
-                {
-                    MessageBox.Show(
-                        "请输入入口方法名。",
-                        "参数缺失",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
-                    return;
-                }
-
-                // 验证 ProcessId（必填）
-                if (!ProcessId.HasValue || ProcessId.Value <= 0)
-                {
-                    MessageBox.Show(
-                        "请输入有效的目标进程 ID。",
-                        "参数缺失",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
-                    return;
-                }
-
-                // 验证 ProcessId 对应的进程是否存在
-                var targetProcess = System.Diagnostics.Process.GetProcesses()
-                    .FirstOrDefault(p => p.Id == ProcessId.Value);
-
-                if (targetProcess == null)
-                {
-                    MessageBox.Show(
-                        $"进程 ID {ProcessId.Value} 不存在，请检查后重试。",
-                        "进程不存在",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
-                    return;
-                }
-
-                // 写入共享内存
-                _frameworkVersionMem.Write(FrameworkVersion ?? string.Empty);
-                _assemblyPathMem.Write(AssemblyPath);
-                _entryClassMem.Write(EntryClass);
-                _entryMethodMem.Write(EntryMethod);
-                _entryMethodArgumentMem.Write(EntryMethodArgument ?? string.Empty);
-
-                _logger.LogInformation(
-                    "数据已成功写入共享内存，准备注入进程 {ProcessId} ({ProcessName})。",
-                    ProcessId.Value,
-                    targetProcess.ProcessName);
-
-                // 获取工具路径和注入库路径
-                if (!TryGetInjectorPaths(targetProcess, out string toolPath, out string unmanagedAssemblyPath))
-                {
-                    return;
-                }
-
-                // 校验文件是否存在
-                if (!File.Exists(toolPath))
-                {
-                    _logger.LogError("注入工具不存在: {ToolPath}", toolPath);
-                    MessageBox.Show(
-                        $"注入工具不存在，请检查安装是否完整。\n路径: {toolPath}",
-                        "文件缺失",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Error);
-                    return;
-                }
-
-                if (!File.Exists(unmanagedAssemblyPath))
-                {
-                    _logger.LogError("注入库不存在: {UnmanagedAssemblyPath}", unmanagedAssemblyPath);
-                    MessageBox.Show(
-                        $"注入库不存在，请检查安装是否完整。\n路径: {unmanagedAssemblyPath}",
-                        "文件缺失",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Error);
-                    return;
-                }
-
-                // 构建注入器参数
-                string arguments = $"\"{unmanagedAssemblyPath}\" -p {ProcessId.Value}";
-
-                _logger.LogInformation("启动注入器: {ToolPath} {Arguments}", toolPath, arguments);
-
-                // 启动注入进程
-                var processInfo = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = toolPath,
-                    Arguments = arguments,
-                    UseShellExecute = false,  // 改为 false，避免弹控制台窗口
-                    CreateNoWindow = true,     // 不创建窗口
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true
-                };
-
-                using var process = System.Diagnostics.Process.Start(processInfo);
-
-                if (process == null)
-                {
-                    _logger.LogError("启动注入器失败。");
-                    MessageBox.Show(
-                        "启动注入器失败，请检查工具权限。",
-                        "启动失败",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Error);
-                    return;
-                }
-
-                // 等待注入完成（设置超时）
-                bool exited = process.WaitForExit(30000); // 30 秒超时
-
-                if (!exited)
-                {
-                    process.Kill();
-                    _logger.LogError("注入器执行超时。");
-                    MessageBox.Show(
-                        "注入操作超时，可能目标进程无响应。",
-                        "超时",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
-                    return;
-                }
-
-                // 读取输出
-                string output = process.StandardOutput.ReadToEnd();
-                string error = process.StandardError.ReadToEnd();
-
-                if (process.ExitCode == 0)
-                {
-                    _logger.LogInformation("注入成功。输出: {Output}", output);
-                    MessageBox.Show(
-                        $"注入成功！\n目标进程: {ProcessId.Value} ({targetProcess.ProcessName})\n\n{output}",
-                        "注入成功",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
-                }
-                else
-                {
-                    _logger.LogError("注入失败，退出码: {ExitCode}，错误: {Error}", process.ExitCode, error);
-                    MessageBox.Show(
-                        $"注入失败！\n退出码: {process.ExitCode}\n错误: {error}\n\n{output}",
-                        "注入失败",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Error);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "注入过程发生错误。");
-                MessageBox.Show(
-                    $"注入过程发生错误：\n{ex.Message}",
-                    "错误",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
+    private static IEnumerable<string> GetFrameworkVersions()
+    {
+        var windowsFolder = Environment.GetEnvironmentVariable("windir");
+        if (string.IsNullOrWhiteSpace(windowsFolder))
+        {
+            yield break;
         }
 
-        /// <summary>
-        /// 根据当前进程位数和框架版本，获取注入器路径和注入库路径
-        /// </summary>
-        /// <param name="toolPath">输出：注入器 exe 路径</param>
-        /// <param name="unmanagedAssemblyPath">输出：注入库 dll 路径</param>
-        /// <returns>是否成功获取路径</returns>
-        private bool TryGetInjectorPaths(Process targetProcess, out string toolPath, out string unmanagedAssemblyPath)
+        var frameworkDirectory = Path.Combine(windowsFolder, "Microsoft.NET", "Framework");
+        if (!Directory.Exists(frameworkDirectory))
         {
-            toolPath = string.Empty;
-            unmanagedAssemblyPath = string.Empty;
+            yield break;
+        }
 
-            try
-            {
-                string baseDirectory = AppContext.BaseDirectory;
-                string archFolder = Is64Bit(targetProcess) ? "x64" : "x86";
+        var directories = new DirectoryInfo(frameworkDirectory)
+            .GetDirectories()
+            .Where(item => item.Name.StartsWith("v", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(item => item.Name, StringComparer.OrdinalIgnoreCase);
 
-                // 注入器路径
-                toolPath = Path.Combine(baseDirectory, "Tools", archFolder, "injector.exe");
+        foreach (var directory in directories)
+        {
+            yield return directory.Name;
+        }
+    }
 
-                // 根据框架版本确定注入库
-                string frameworkFolder = FrameworkVersion switch
+    private void HandlePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        switch (e.PropertyName)
+        {
+            case nameof(SelectedRuntimeOption):
+                if (SelectedRuntimeOption?.Kind != InjectionRuntimeKind.DotNetFramework)
                 {
-                    "Mono" => "MonoInjectionLibrary.dll", // Mono 暂不支持
-                    ".NetCore" => "CoreInjectionLibrary.dll",
-                    _ => "FrameworkInjectionLibrary.dll" // 默认 .NET Framework
-                };
+                    FrameworkVersion = string.Empty;
+                }
 
-                unmanagedAssemblyPath = Path.Combine(baseDirectory, "Tools", archFolder, frameworkFolder);
+                OnPropertyChanged(nameof(IsFrameworkVersionEnabled));
+                OnPropertyChanged(nameof(SelectedRuntimeDescription));
+                break;
+            case nameof(SelectedProcess):
+                if (SelectedProcess is not null)
+                {
+                    TargetProcessIdText = SelectedProcess.ProcessId.ToString(CultureInfo.InvariantCulture);
+                    FooterMessage = $"已选择 {SelectedProcess.ProcessName} ({SelectedProcess.ProcessId})。";
+                }
 
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "获取注入器路径失败。");
-                MessageBox.Show(
-                    "获取注入器路径失败，请检查配置。",
-                    "错误",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-                return false;
-            }
+                OnPropertyChanged(nameof(SelectedProcessSummary));
+                break;
+            case nameof(TargetProcessIdText):
+                OnPropertyChanged(nameof(SelectedProcessSummary));
+                break;
+            case nameof(ProcessSearchText):
+                ApplyProcessFilter();
+                break;
         }
-
-        [DllImport("kernel32.dll", SetLastError = true, CallingConvention = CallingConvention.Winapi)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool IsWow64Process(IntPtr process, out bool wow64Process);
-
-        /// <summary>
-        /// 判断进程是 64 位还是 32 位
-        /// </summary>
-        /// <param name="process">目标进程</param>
-        /// <returns>true = x64, false = x86</returns>
-        public static bool Is64Bit(Process process)
-        {
-            if (!Environment.Is64BitOperatingSystem)
-            {
-                // 32 位系统上所有进程都是 32 位的
-                return false;
-            }
-
-            if (!Environment.Is64BitProcess)
-            {
-                throw new InvalidOperationException(
-                    "当前程序是 32 位，无法检测其他进程的位数。");
-            }
-
-            IsWow64Process(process.Handle, out bool isWow64);
-            return !isWow64; // 不是 Wow64 = 原生 64 位
-        }
-        #endregion
     }
 }
