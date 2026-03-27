@@ -8,10 +8,10 @@ public:
     // 参数配置结构体
     struct Config {
         size_t maxFrameworkVersionLen = 128;   // 最大框架版本长度
-        size_t maxAssemblyFileLen = 256;       // 最大程序集路径长度
+        size_t maxAssemblyFileLen = 512;       // 最大程序集路径长度
         size_t maxEntryClassLen = 128;         // 最大入口类名长度
         size_t maxEntryMethodLen = 128;        // 最大入口方法名长度
-        size_t maxEntryArgLen = 256;           // 最大参数长度
+        size_t maxEntryArgLen = 512;           // 最大参数长度
     };
 
 private:

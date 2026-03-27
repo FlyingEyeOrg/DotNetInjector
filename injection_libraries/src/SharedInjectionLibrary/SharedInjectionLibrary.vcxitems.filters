@@ -24,12 +24,18 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)injection_parameters.h">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="$(MSBuildThisFileDirectory)managed_runtime_resolver.h">
+      <Filter>include</Filter>
+    </ClInclude>
     <ClInclude Include="$(MSBuildThisFileDirectory)string_converter.h">
       <Filter>include</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="$(MSBuildThisFileDirectory)logger.cpp">
+      <Filter>srouce</Filter>
+    </ClCompile>
+    <ClCompile Include="$(MSBuildThisFileDirectory)managed_runtime_resolver.cpp">
       <Filter>srouce</Filter>
     </ClCompile>
   </ItemGroup>

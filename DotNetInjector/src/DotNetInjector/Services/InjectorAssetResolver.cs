@@ -11,16 +11,27 @@ internal static class InjectorAssetResolver
         var normalizedArchitecture = architecture.Equals("x64", StringComparison.OrdinalIgnoreCase) ? "x64" : "x86";
         var toolDirectory = Path.Combine(baseDirectory, "Tools", normalizedArchitecture);
 
-        var payloadName = runtime switch
+        var payloadName = ResolvePayloadName(toolDirectory, runtime);
+
+        return (
+            ResolveToolPath(toolDirectory),
+            Path.Combine(toolDirectory, payloadName));
+    }
+
+    private static string ResolvePayloadName(string toolDirectory, InjectionRuntimeKind runtime)
+    {
+        const string unifiedPayloadName = "ManagedInjectionLibrary.dll";
+        if (File.Exists(Path.Combine(toolDirectory, unifiedPayloadName)))
+        {
+            return unifiedPayloadName;
+        }
+
+        return runtime switch
         {
             InjectionRuntimeKind.DotNet => "CoreInjectionLibrary.dll",
             InjectionRuntimeKind.Mono => "MonoInjectionLibrary.dll",
             _ => "FrameworkInjectionLibrary.dll",
         };
-
-        return (
-            ResolveToolPath(toolDirectory),
-            Path.Combine(toolDirectory, payloadName));
     }
 
     private static string ResolveToolPath(string toolDirectory)
