@@ -7,6 +7,9 @@ using Microsoft.Extensions.Logging;
 
 var dotnet_root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
 
+Console.OutputEncoding = Encoding.UTF8;
+Console.InputEncoding = Encoding.UTF8;
+
 var targets = new[]
 {
     new ValidationTarget(
@@ -19,7 +22,7 @@ var targets = new[]
         entry_class: "InjectionClassLibrary.InjectionClass",
         entry_method: "InjectionMethod",
         entry_argument: "framework-validation",
-        expected_markers: ["print value: framework-validation", "Entry Assembly: InjectionDemo"]),
+        expected_markers: ["print value: framework-validation", "方法强制调用成功", "Entry Assembly: InjectionDemo"]),
     new ValidationTarget(
         "core",
         InjectionRuntimeKind.DotNet,
@@ -30,7 +33,7 @@ var targets = new[]
         entry_class: "CoreInjectionClassLibrary.InjectionClass",
         entry_method: "InjectionMethod",
         entry_argument: "core-validation",
-        expected_markers: ["print value: core-validation", "Entry Assembly: CoreInjectionDemo"]),
+        expected_markers: ["print value: core-validation", "方法强制调用成功", "Entry Assembly: CoreInjectionDemo"]),
     new ValidationTarget(
         "mono",
         InjectionRuntimeKind.Mono,
@@ -41,7 +44,7 @@ var targets = new[]
         entry_class: "InjectionClassLibrary.InjectionClass",
         entry_method: "InjectionMethod",
         entry_argument: "mono-validation",
-        expected_markers: ["print value: mono-validation", "Entry Assembly: InjectionDemo"]),
+        expected_markers: ["print value: mono-validation", "方法强制调用成功", "Entry Assembly: InjectionDemo"]),
 };
 
 var selected_names = args.Length == 0 || args.Contains("all", StringComparer.OrdinalIgnoreCase)
@@ -55,7 +58,14 @@ if (selected_targets.Length == 0)
     return 1;
 }
 
-using var logger_factory = LoggerFactory.Create(builder => builder.SetMinimumLevel(LogLevel.Information));
+using var logger_factory = LoggerFactory.Create(builder =>
+    builder
+        .SetMinimumLevel(LogLevel.Information)
+        .AddSimpleConsole(options =>
+        {
+            options.SingleLine = true;
+            options.TimestampFormat = "HH:mm:ss.fff ";
+        }));
 var injector_service = new ManagedInjectorService(logger_factory.CreateLogger<ManagedInjectorService>());
 
 var failures = 0;
@@ -92,6 +102,7 @@ foreach (var target in selected_targets)
         var result = await injector_service.ExecuteAsync(request);
         Console.WriteLine($"  Injector exit: {result.ExitCode}");
         Console.WriteLine($"  Tool: {result.ToolPath}");
+        Console.WriteLine($"  Payload: {result.PayloadPath}");
         if (!string.IsNullOrWhiteSpace(result.StandardOutput))
         {
             Console.WriteLine("  Injector stdout:");
@@ -180,6 +191,8 @@ sealed class TargetProcessSession : IAsyncDisposable
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8,
                 CreateNoWindow = true,
                 WorkingDirectory = Path.GetDirectoryName(target.file_name) ?? AppContext.BaseDirectory,
             },

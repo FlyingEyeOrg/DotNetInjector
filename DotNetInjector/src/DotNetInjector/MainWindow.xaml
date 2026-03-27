@@ -6,6 +6,7 @@
         xmlns:hc="https://handyorg.github.io/handycontrol"
         xmlns:vm="clr-namespace:DotNetInjector.ViewModel"
         mc:Ignorable="d"
+        x:Name="MainWindowRoot"
         Title="DotNetInjector"
         MinHeight="720"
         MinWidth="1280"
@@ -69,7 +70,8 @@
                                 <TextBlock Text="目标进程" FontSize="22" FontWeight="SemiBold" />
                                 <TextBlock Margin="0,6,0,0" Text="可直接选择进程，也可手工输入 PID。" Foreground="#516B77" />
                             </StackPanel>
-                            <Button Grid.Column="1"
+                                <Button x:Name="RefreshProcessesButton"
+                                    Grid.Column="1"
                                     Padding="18,8"
                                     VerticalAlignment="Center"
                                     Command="{Binding RefreshProcessesCommand}">刷新</Button>
@@ -78,10 +80,15 @@
 
                     <StackPanel Margin="20,18,20,12" DockPanel.Dock="Top">
                         <TextBlock Style="{StaticResource TextBlockDefault}" Text="筛选进程" />
-                        <TextBox Margin="0,8,0,0"
+                        <TextBox x:Name="ProcessSearchTextBox"
+                                 Margin="0,8,0,0"
                                  Style="{StaticResource TextBoxExtend}"
                                  hc:InfoElement.Placeholder="按进程名、PID、窗口标题搜索"
                                  Text="{Binding ProcessSearchText, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock x:Name="ProcessCountTextBlock"
+                                   Margin="0,8,0,0"
+                                   Foreground="#6B7F89"
+                                   Text="{Binding FilteredProcessCount, StringFormat=当前结果: {0} 个}" />
                         <TextBlock Margin="0,16,0,0" Style="{StaticResource TextBlockDefault}" Text="目标进程 ID" />
                         <TextBox Margin="0,8,0,0"
                                  Style="{StaticResource TextBoxExtend}"
@@ -89,7 +96,8 @@
                                  Text="{Binding TargetProcessIdText, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
 
-                    <ListBox Margin="12,0,12,12"
+                    <ListBox x:Name="ProcessListBox"
+                             Margin="12,0,12,12"
                              BorderThickness="0"
                              ItemsSource="{Binding FilteredProcesses}"
                              SelectedItem="{Binding SelectedProcess, Mode=TwoWay}"
@@ -104,6 +112,7 @@
                                         BorderThickness="1">
                                     <Grid>
                                         <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
                                             <RowDefinition Height="Auto" />
                                             <RowDefinition Height="Auto" />
                                             <RowDefinition Height="Auto" />
@@ -130,6 +139,13 @@
                                                    Foreground="#6B7F89"
                                                    TextWrapping="Wrap"
                                                    Text="{Binding WindowTitleOrFallback}" />
+                                        <TextBlock Grid.Row="3"
+                                                   Grid.ColumnSpan="2"
+                                                   Margin="0,8,0,0"
+                                                   Foreground="#7A8E97"
+                                                   FontSize="12"
+                                                   TextWrapping="Wrap"
+                                                   Text="{Binding ExecutablePathOrFallback}" />
                                     </Grid>
                                 </Border>
                             </DataTemplate>
@@ -252,19 +268,26 @@
 
                         <hc:Card Grid.Column="2" Background="#F8FBFC" BorderBrush="#D7E3E8" BorderThickness="1">
                             <StackPanel>
-                                <TextBlock Text="当前摘要" FontSize="20" FontWeight="SemiBold" />
+                                <TextBlock x:Name="SummaryHeaderTextBlock" Text="当前摘要" FontSize="20" FontWeight="SemiBold" />
                                 <TextBlock Margin="0,18,0,0" Foreground="#516B77" Text="运行时" />
-                                <TextBlock Margin="0,6,0,0" FontWeight="SemiBold" Text="{Binding SelectedRuntimeDescription}" TextWrapping="Wrap" />
+                                <TextBlock x:Name="RuntimeSummaryTextBlock" Margin="0,6,0,0" FontWeight="SemiBold" Text="{Binding SelectedRuntimeDescription}" TextWrapping="Wrap" />
+                                <TextBlock Margin="0,18,0,0" Foreground="#516B77" Text="Framework 版本" />
+                                <TextBlock Margin="0,6,0,0" FontWeight="SemiBold" Text="{Binding FrameworkVersionSummary}" TextWrapping="Wrap" />
                                 <TextBlock Margin="0,18,0,0" Foreground="#516B77" Text="目标进程" />
                                 <TextBlock Margin="0,6,0,0" FontWeight="SemiBold" Text="{Binding SelectedProcessSummary}" TextWrapping="Wrap" />
+                                <TextBlock Margin="0,18,0,0" Foreground="#516B77" Text="进程路径" />
+                                <TextBlock Margin="0,6,0,0" Text="{Binding SelectedProcessPathSummary}" TextWrapping="Wrap" />
                                 <TextBlock Margin="0,18,0,0" Foreground="#516B77" Text="程序集" />
                                 <TextBlock Margin="0,6,0,0" Text="{Binding AssemblyPath}" TextWrapping="Wrap" />
+                                <TextBlock Margin="0,18,0,0" Foreground="#516B77" Text="入口方法" />
+                                <TextBlock Margin="0,6,0,0" Text="{Binding EntrySignatureSummary}" TextWrapping="Wrap" />
                                 <TextBlock Margin="0,18,0,0" Foreground="#516B77" Text="入口签名约束" />
                                 <TextBlock Margin="0,6,0,0"
                                            Foreground="#6B7F89"
                                            Text="类型不能为嵌套类；入口方法必须为 public static int Method(string value)。"
                                            TextWrapping="Wrap" />
-                                <Button Margin="0,28,0,0"
+                                <Button x:Name="InjectButton"
+                                    Margin="0,28,0,0"
                                         Height="44"
                                         Style="{StaticResource ButtonPrimary}"
                                         Command="{Binding InjectAsyncCommand}">开始注入</Button>
@@ -289,35 +312,42 @@
                         <TextBlock Text="执行结果"
                                    FontSize="22"
                                    FontWeight="SemiBold" />
-                        <Border Grid.Row="2"
-                                Padding="16"
-                                Background="#0E2230"
-                                CornerRadius="12">
-                            <TextBox Background="Transparent"
-                                     BorderThickness="0"
-                                     Foreground="#D7F0FF"
-                                     FontFamily="Consolas"
-                                     TextWrapping="Wrap"
-                                     AcceptsReturn="True"
-                                     IsReadOnly="True"
-                                     VerticalScrollBarVisibility="Auto"
-                                     Text="{Binding LastStandardOutput}" />
-                        </Border>
-                        <Border Grid.Row="2"
-                                Grid.Column="2"
-                                Padding="16"
-                                Background="#2F1619"
-                                CornerRadius="12">
-                            <TextBox Background="Transparent"
-                                     BorderThickness="0"
-                                     Foreground="#FFD8D8"
-                                     FontFamily="Consolas"
-                                     TextWrapping="Wrap"
-                                     AcceptsReturn="True"
-                                     IsReadOnly="True"
-                                     VerticalScrollBarVisibility="Auto"
-                                     Text="{Binding LastStandardError}" />
-                        </Border>
+                        <StackPanel Grid.Row="2">
+                            <TextBlock Foreground="#516B77" Text="标准输出" />
+                            <Border Margin="0,8,0,0"
+                                    Padding="16"
+                                    Background="#0E2230"
+                                    CornerRadius="12">
+                                <TextBox x:Name="StandardOutputTextBox"
+                                         Background="Transparent"
+                                         BorderThickness="0"
+                                         Foreground="#D7F0FF"
+                                         FontFamily="Consolas"
+                                         TextWrapping="Wrap"
+                                         AcceptsReturn="True"
+                                         IsReadOnly="True"
+                                         VerticalScrollBarVisibility="Auto"
+                                         Text="{Binding LastStandardOutput}" />
+                            </Border>
+                        </StackPanel>
+                        <StackPanel Grid.Row="2" Grid.Column="2">
+                            <TextBlock Foreground="#516B77" Text="标准错误" />
+                            <Border Margin="0,8,0,0"
+                                    Padding="16"
+                                    Background="#2F1619"
+                                    CornerRadius="12">
+                                <TextBox x:Name="StandardErrorTextBox"
+                                         Background="Transparent"
+                                         BorderThickness="0"
+                                         Foreground="#FFD8D8"
+                                         FontFamily="Consolas"
+                                         TextWrapping="Wrap"
+                                         AcceptsReturn="True"
+                                         IsReadOnly="True"
+                                         VerticalScrollBarVisibility="Auto"
+                                         Text="{Binding LastStandardError}" />
+                            </Border>
+                        </StackPanel>
                     </Grid>
                 </hc:Card>
             </Grid>
@@ -329,8 +359,8 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock VerticalAlignment="Center" Text="{Binding FooterMessage}" />
-                <TextBlock Grid.Column="1" VerticalAlignment="Center" Foreground="#6B7F89" Text="{Binding LastExecutionMeta}" />
+                <TextBlock x:Name="FooterMessageTextBlock" VerticalAlignment="Center" Text="{Binding FooterMessage}" />
+                <TextBlock x:Name="LastExecutionMetaTextBlock" Grid.Column="1" VerticalAlignment="Center" Foreground="#6B7F89" Text="{Binding LastExecutionMeta}" />
             </Grid>
         </Border>
     </Grid>

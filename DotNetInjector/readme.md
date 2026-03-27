@@ -1,92 +1,142 @@
 # DotNetInjector
 
-## 简介
+一个面向 `.NET Framework`、`.NET / .NET Core`、`Mono` 的托管程序集注入工作台。
 
-这是一个 .NET 进程注入工具，该工具的作用是将自定义的 .NET 程序集，注入到目标 .NET 程序中，然后执行自定义的 .NET 代码。
-注入方式使用的是远程线程注入，所以注入的 .NET 代码执行的线程环境是一个单独的线程。
-该工具支持 .NetCore，.Net Framework，Mono 三种类型的进程注入。
+当前版本重点解决了三类问题：
+
+- 注入链稳定性：修复了请求文件桥接、跨位数注入器选择、Mono UTF-8 路径和入口解析兼容性。
+- UI 可用性：主窗口摘要区、结果区、进程筛选和状态展示更清晰，并补上了可执行的 UI 自动化冒烟。
+- 工程化结构：补充共享构建配置、架构文档、独立运行时 smoke tests 和更完整的 README。
+
+## 功能特性
+
+- 支持 `.NET Framework`、`.NET / .NET Core`、`Mono` 目标进程注入。
+- 支持 `x86` / `x64` 目标进程，自动选择匹配位数的 `WinInjector.exe` 与 `ManagedInjectionLibrary.dll`。
+- 使用请求文件桥接注入参数，规避固定共享内存命名导致的串扰。
+- 内置日志、联调 Demo、单元测试、运行时 smoke tests、主窗口 UI smoke test。
+
+## 目录结构
+
+- `src/DotNetInjector/`: WPF 主程序、ViewModel、服务层和工具资产。
+- `demo/`: Framework / Core / Mono 联调目标、注入类库和 `InjectionValidationRunner`。
+- `tests/`: 单元测试与冒烟测试。
+- `docs/`: 架构与项目结构文档。
+- `../injection_libraries/src/ManagedInjectionLibrary/`: 原生桥接 DLL。
+- `../injection_libraries/src/SharedInjectionLibrary/`: 原生共享运行时解析、参数桥接和日志组件。
+
+详细架构说明见 `docs/architecture.md`。
 
 ## 注入约定
 
-* 版本约定：framework sdk 的程序需要选择正确的 framework sdk 版本，否则将会注入失败
-* 入口类型约定：入口类型不能是嵌套类
-* 入口方法约定：入口方法必须有且只有一个 string 类型的参数，返回值为 int，必须是 public static 签名
+- 入口类型不能是嵌套类型。
+- 默认入口签名为 `public static int Method(string value)`。
+- `Mono` 路径现已兼容同名的无参入口方法回退，但推荐仍使用统一签名，便于三类运行时共享一套程序集。
+- `.NET Framework` 注入时，应填写与目标进程匹配的 CLR 版本，例如 `v4.0.30319`。
+- 被注入托管程序集的目标框架应与目标运行时兼容。
 
-## 程序原理
+## 工作原理
 
-`DotNetInjector` 调用 `WinInjector.exe` 将统一的非托管桥接库 `ManagedInjectionLibrary.dll` 注入目标进程。
-`DotNetInjector` 自身只按 `x64` 方式构建；注入阶段始终使用 `Tools\x64\WinInjector.exe`，再根据目标进程位数选择 `x86/x64` 版本的 `ManagedInjectionLibrary.dll`。
-`ManagedInjectionLibrary.dll` 会优先读取按目标进程 PID 生成的请求文件，并在目标进程内自动分发到 `.NET Framework`、`.NET / .NET Core` 或 `Mono` 的执行路径，
-然后调用约定的入口方法，在托管环境执行自定义的 .NET 代码。
+1. WPF 主程序解析目标进程位数与运行时类型。
+2. `ManagedInjectorService` 选择对应架构的 `WinInjector.exe` 与 `ManagedInjectionLibrary.dll`。
+3. 注入请求被发布到临时目录和桥接 DLL 所在目录，供远端进程读取。
+4. 原生桥接 DLL 在目标进程中启动工作线程，读取参数并分发到 `.NET Framework`、`.NET / .NET Core`、`Mono` 对应执行路径。
+5. 目标托管入口方法执行后，将输出写回目标控制台或日志文件。
 
-这样可以满足：
+## 快速开始
 
-* `x64 WinInjector` 注入 `x64 .NET` 进程
-* `x64 WinInjector` 通过 `x64loader` 注入 `x86 .NET` 进程
-* `DotNetInjector` 不再依赖固定名称共享内存，避免多次注入或并发注入时发生串扰
-
-## 日志
-
-可以在当前 windows 的 `%Temp%` 目录下，查找 `[b62658dd-18f4-4de3-a09c-53c6c6cbf7d4]-InjectionLogs` 目录，该目录存储的是注入过程的日志文件。
-
-## 软件使用教程
-
-* SDK 版本：如果是 .Net Framework，需要选择/输入对应的 .NET Framework 版本，Core/Mono 选择对应的选项即可
-* 托管程序集路径(DLL)：该程序集是需要注入到 .NET 程序 CLR 的托管程序集，类库的 TFM 一定要与目标 .NET 程序 TFM 版本相同
-* 调用类型名称：入口类型名称，使用全名，例如 `CoreInjectionClassLibrary.InjectionClass`
-* 调用方法名称：入口方法，方法签名必须为 `public static int InjectionMethod(string value)`，否则可能会导致目标进程异常退出，示例：`InjectionMethod`
-* 调用方法参数：传递个 `InjectionMethod` 方法的参数，可为空
-* 目标进程 Id：需要注入的目标进程 ID，必须是 .NET 进程，否则注入失败
-
-## 联调验证
-
-仓库内提供了自动化联调工具：
+### 1. 构建主程序
 
 ```powershell
-dotnet run --project .\demo\InjectionValidationRunner\InjectionValidationRunner.csproj -- all
+dotnet build .\src\DotNetInjector\DotNetInjector.csproj -c Debug
 ```
 
-该命令会分别启动 `.NET Framework`、`.NET / .NET Core` 和 `Mono` 目标进程，调用当前 `ManagedInjectorService` 执行真实注入，并校验目标控制台输出。
-
-## 测试
-
-单元测试：
+### 2. 构建原生桥接库
 
 ```powershell
-dotnet test .\tests\DotNetInjector.Tests\DotNetInjector.Tests.csproj -c Release
+& 'D:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\MSBuild.exe' \
+  'E:\Projects\DotNetInjector\injection_libraries\src\ManagedInjectionLibrary\ManagedInjectionLibrary.vcxproj' \
+  /p:Configuration=Release /p:Platform=x64
+
+& 'D:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\MSBuild.exe' \
+  'E:\Projects\DotNetInjector\injection_libraries\src\ManagedInjectionLibrary\ManagedInjectionLibrary.vcxproj' \
+  /p:Configuration=Release /p:Platform=Win32
 ```
 
-冒烟测试：
+然后把输出同步到：
+
+- `src/DotNetInjector/Tools/x64/ManagedInjectionLibrary.dll`
+- `src/DotNetInjector/Tools/x86/ManagedInjectionLibrary.dll`
+
+### 3. 运行主程序
 
 ```powershell
-dotnet test .\tests\DotNetInjector.SmokeTests\DotNetInjector.SmokeTests.csproj -c Release
+dotnet run --project .\src\DotNetInjector\DotNetInjector.csproj -c Debug
 ```
 
-## 类库示例
+## 联调与测试
 
-```c#
+### 运行完整验证
+
+```powershell
+dotnet run --project .\demo\InjectionValidationRunner\InjectionValidationRunner.csproj -c Release -- all
+```
+
+### 只验证单个运行时
+
+```powershell
+dotnet run --project .\demo\InjectionValidationRunner\InjectionValidationRunner.csproj -c Release -- framework
+dotnet run --project .\demo\InjectionValidationRunner\InjectionValidationRunner.csproj -c Release -- core
+dotnet run --project .\demo\InjectionValidationRunner\InjectionValidationRunner.csproj -c Release -- mono
+```
+
+### 单元测试
+
+```powershell
+dotnet run --project .\tests\DotNetInjector.Tests\DotNetInjector.Tests.csproj -c Release
+```
+
+### 冒烟测试
+
+```powershell
+dotnet run --project .\tests\DotNetInjector.SmokeTests\DotNetInjector.SmokeTests.csproj -c Release
+```
+
+当前 smoke tests 包含：
+
+- `.NET Framework` 注入冒烟
+- `.NET / .NET Core` 注入冒烟
+- `Mono` 注入冒烟
+- 主窗口 UI 自动化冒烟
+
+## 日志与排障
+
+- 注入原生日志目录：`%Temp%\[b62658dd-18f4-4de3-a09c-53c6c6cbf7d4]-InjectionLogs`
+- 如果看到 `.NET Framework` 注入失败，先核对 `Framework 版本` 是否与目标进程一致。
+- 如果看到 `Mono` 注入失败，优先确认目标进程确实已加载 `mono-2.0-*.dll`，并检查程序集路径是否包含非 ASCII 字符。
+- 如果看到跨位数问题，确认 `Tools/x86/WinInjector.exe` 与 `Tools/x64/WinInjector.exe` 都已存在。
+
+## 示例入口方法
+
+```csharp
 using System;
 using System.Reflection;
 
-// 一定要使用一个名称空间
-namespace CoreInjectionClassLibrary
+namespace CoreInjectionClassLibrary;
+
+public class InjectionClass
 {
-    // 入口类型
-    public class InjectionClass
+    public static int InjectionMethod(string value)
     {
-        // 入口方法
-        public static int InjectionMethod(string value)
-        {
-            Console.WriteLine("print value: " + value);
-            Console.WriteLine("方法强制调用成功");
-
-            var asm = Assembly.GetEntryAssembly();
-
-            Console.WriteLine("Entry Assembly: " + asm?.FullName);
-
-            return 0;
-        }
+        Console.OutputEncoding = System.Text.Encoding.UTF8;
+        Console.WriteLine("print value: " + value);
+        Console.WriteLine("方法强制调用成功");
+        Console.WriteLine("Entry Assembly: " + Assembly.GetEntryAssembly()?.FullName);
+        return 0;
     }
 }
-
 ```
+
+## 文档
+
+- `docs/architecture.md`: 当前仓库的结构、模块职责和注入链路。
+- `BLOG.md`: 本轮修复与工程化整理的博客稿。

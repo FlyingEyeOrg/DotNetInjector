@@ -75,6 +75,11 @@ struct MonoApi {
     FnMonoObjectUnbox mono_object_unbox{};
 };
 
+struct MonoResolvedMethod {
+    MonoMethod* method{};
+    bool takes_argument{};
+};
+
 ICLRRuntimeHost* framework_runtime_host = nullptr;
 bool framework_runtime_initialized = false;
 
@@ -335,6 +340,33 @@ bool load_mono_api(MonoApi& api) {
            api.mono_object_unbox;
 }
 
+MonoResolvedMethod resolve_mono_method(
+    const MonoApi& api,
+    MonoClass* klass,
+    const std::string& entry_class_utf8,
+    const std::string& entry_method_utf8,
+    bool include_namespace) {
+    const std::string method_descriptors[] = {
+        entry_class_utf8 + "::" + entry_method_utf8 + "(string)",
+        entry_class_utf8 + "::" + entry_method_utf8 + "()",
+    };
+
+    for (size_t index = 0; index < std::size(method_descriptors); ++index) {
+        auto* method_desc = api.mono_method_desc_new(method_descriptors[index].c_str(), include_namespace ? TRUE : FALSE);
+        if (!method_desc) {
+            continue;
+        }
+
+        auto* method = api.mono_method_desc_search_in_class(method_desc, klass);
+        api.mono_method_desc_free(method_desc);
+        if (method) {
+            return MonoResolvedMethod{method, index == 0};
+        }
+    }
+
+    return MonoResolvedMethod{};
+}
+
 bool execute_via_mono(const InjectionParameters& parameters) {
     MonoApi api{};
     if (!load_mono_api(api)) {
@@ -353,18 +385,18 @@ bool execute_via_mono(const InjectionParameters& parameters) {
         return false;
     }
 
-    const auto assembly_file_gbk =
-        StringConverter::wstring_to_gbk(parameters.get_assembly_file());
-    const auto entry_class_gbk =
-        StringConverter::wstring_to_gbk(parameters.get_entry_class());
-    const auto entry_method_gbk =
-        StringConverter::wstring_to_gbk(parameters.get_entry_method());
-    const auto entry_argument_gbk =
-        StringConverter::wstring_to_gbk(parameters.get_entry_argument());
+    const auto assembly_file_utf8 =
+        StringConverter::wstring_to_utf8(parameters.get_assembly_file());
+    const auto entry_class_utf8 =
+        StringConverter::wstring_to_utf8(parameters.get_entry_class());
+    const auto entry_method_utf8 =
+        StringConverter::wstring_to_utf8(parameters.get_entry_method());
+    const auto entry_argument_utf8 =
+        StringConverter::wstring_to_utf8(parameters.get_entry_argument());
 
-    auto* assembly = api.mono_domain_assembly_open(domain, assembly_file_gbk.c_str());
+    auto* assembly = api.mono_domain_assembly_open(domain, assembly_file_utf8.c_str());
     if (!assembly) {
-        Logger::log("Failed to open Mono assembly: %s", assembly_file_gbk.c_str());
+        Logger::log("Failed to open Mono assembly: %s", assembly_file_utf8.c_str());
         return false;
     }
 
@@ -376,7 +408,7 @@ bool execute_via_mono(const InjectionParameters& parameters) {
 
     std::string namespace_name;
     std::string class_name;
-    extract_namespace_and_class(entry_class_gbk, namespace_name, class_name);
+    extract_namespace_and_class(entry_class_utf8, namespace_name, class_name);
 
     auto* klass = api.mono_class_from_name(image, namespace_name.c_str(), class_name.c_str());
     if (!klass) {
@@ -384,30 +416,33 @@ bool execute_via_mono(const InjectionParameters& parameters) {
         return false;
     }
 
-    const std::string method_desc_text = entry_class_gbk + "::" + entry_method_gbk + "(string)";
-    auto* method_desc = api.mono_method_desc_new(method_desc_text.c_str(),
-                                                 namespace_name.empty() ? FALSE : TRUE);
-    if (!method_desc) {
-        Logger::log("Failed to create Mono method descriptor: %s", method_desc_text.c_str());
+    const auto resolved_method = resolve_mono_method(
+        api,
+        klass,
+        entry_class_utf8,
+        entry_method_utf8,
+        !namespace_name.empty());
+    if (!resolved_method.method) {
+        Logger::log("Mono method was not found: %s", entry_method_utf8.c_str());
         return false;
     }
 
-    auto* method = api.mono_method_desc_search_in_class(method_desc, klass);
-    api.mono_method_desc_free(method_desc);
-    if (!method) {
-        Logger::log("Mono method was not found: %s", entry_method_gbk.c_str());
-        return false;
+    MonoString* argument = nullptr;
+    void* args[1] = {};
+    void** invocation_args = nullptr;
+    if (resolved_method.takes_argument) {
+        argument = api.mono_string_new(domain, entry_argument_utf8.c_str());
+        if (!argument) {
+            Logger::log("Failed to allocate Mono argument string.");
+            return false;
+        }
+
+        args[0] = argument;
+        invocation_args = args;
     }
 
-    auto* argument = api.mono_string_new(domain, entry_argument_gbk.c_str());
-    if (!argument) {
-        Logger::log("Failed to allocate Mono argument string.");
-        return false;
-    }
-
-    void* args[1] = {argument};
     MonoObject* exception = nullptr;
-    MonoObject* result = api.mono_runtime_invoke(method, nullptr, args, &exception);
+    MonoObject* result = api.mono_runtime_invoke(resolved_method.method, nullptr, invocation_args, &exception);
     if (exception) {
         auto* exception_text = api.mono_object_to_string(exception, nullptr);
         if (exception_text) {
@@ -420,7 +455,7 @@ bool execute_via_mono(const InjectionParameters& parameters) {
         return false;
     }
 
-    auto* method_signature = api.mono_method_signature(method);
+    auto* method_signature = api.mono_method_signature(resolved_method.method);
     if (!method_signature) {
         Logger::log("Failed to query Mono method signature.");
         return false;
@@ -437,7 +472,13 @@ bool execute_via_mono(const InjectionParameters& parameters) {
         return false;
     }
 
-    const int return_value = *reinterpret_cast<int*>(api.mono_object_unbox(result));
+    auto* unboxed_result = api.mono_object_unbox(result);
+    if (!unboxed_result) {
+        Logger::log("Mono method returned a null boxed result.");
+        return false;
+    }
+
+    const int return_value = *reinterpret_cast<int*>(unboxed_result);
     Logger::log("Mono managed method executed successfully. Return value=%d",
                 return_value);
     return true;
@@ -463,33 +504,66 @@ bool dispatch_runtime(const InjectionParameters& parameters) {
     }
 }
 
+DWORD WINAPI execute_managed_injection(LPVOID parameter) {
+    Logger::initialize();
+
+    const auto module = static_cast<HMODULE>(parameter);
+    Logger::log("Managed injection worker thread started. Module=%p", module);
+    wchar_t module_file_path[MAX_PATH] = L"";
+    std::optional<std::filesystem::path> module_directory;
+    const DWORD module_path_length = ::GetModuleFileNameW(module, module_file_path, MAX_PATH);
+    if (module_path_length > 0 && module_path_length < MAX_PATH) {
+        module_directory = std::filesystem::path(module_file_path).parent_path();
+    }
+
+    InjectionParameters parameters;
+    const DWORD current_process_id = ::GetCurrentProcessId();
+    if (!parameters.load_for_process_id(current_process_id, module_directory)) {
+        Logger::log(
+            "Failed to load injection parameters. CurrentProcessId=%lu, Reason=%s, CandidatePaths:\n%s",
+            current_process_id,
+            StringConverter::wstring_to_gbk(parameters.get_load_failure_reason()).c_str(),
+            StringConverter::wstring_to_gbk(parameters.get_request_lookup_summary()).c_str());
+        return 1;
+    }
+
+    Logger::log("Opened injection parameter request file.");
+    Logger::log("Injection parameters:\n%s",
+                StringConverter::wstring_to_gbk(parameters.get_debug_summary()).c_str());
+
+    if (!validate_parameters(parameters)) {
+        return 2;
+    }
+
+    log_parameters(parameters);
+    if (!dispatch_runtime(parameters)) {
+        return 3;
+    }
+
+    return 0;
+}
+
 }  // namespace
 
 BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID reserved) {
-    Logger::initialize();
-
     switch (reason) {
         case DLL_PROCESS_ATTACH: {
             DisableThreadLibraryCalls(module);
 
-            InjectionParameters parameters;
-            if (!parameters.open()) {
-                Logger::log("Failed to connect to shared memory parameters.");
+            const HANDLE worker_thread = ::CreateThread(
+                nullptr,
+                0,
+                &execute_managed_injection,
+                module,
+                0,
+                nullptr);
+            if (!worker_thread) {
+                Logger::initialize();
+                Logger::log("Failed to create managed injection worker thread. LastError=%lu", ::GetLastError());
                 return FALSE;
             }
 
-            Logger::log("Connected to shared memory parameters.");
-            Logger::log("Injection parameters:\n%s",
-                        StringConverter::wstring_to_gbk(parameters.get_debug_summary()).c_str());
-
-            if (!validate_parameters(parameters)) {
-                return FALSE;
-            }
-
-            log_parameters(parameters);
-            if (!dispatch_runtime(parameters)) {
-                return FALSE;
-            }
+            ::CloseHandle(worker_thread);
             break;
         }
         case DLL_THREAD_ATTACH:

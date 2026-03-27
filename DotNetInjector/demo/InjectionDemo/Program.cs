@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Text;
 using System.Threading;
 
 namespace InjectionDemo
@@ -8,6 +9,9 @@ namespace InjectionDemo
     {
         static void Main(string[] args)
         {
+            Console.OutputEncoding = Encoding.UTF8;
+            Console.InputEncoding = Encoding.UTF8;
+
             var nonInteractive = Array.Exists(args, arg =>
                 string.Equals(arg, "--non-interactive", StringComparison.OrdinalIgnoreCase));
 

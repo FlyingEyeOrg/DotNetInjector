@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Reflection;
+using System.Text;
 
 namespace InjectionClassLibrary
 {
@@ -8,6 +9,8 @@ namespace InjectionClassLibrary
     {
         public static int InjectionMethod(string value)
         {
+            Console.OutputEncoding = Encoding.UTF8;
+
             Console.WriteLine(Process.GetCurrentProcess().Id);
             AppDomain.CurrentDomain.FirstChanceException += (s, e) =>
             {

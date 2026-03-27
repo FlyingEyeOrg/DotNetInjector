@@ -13,7 +13,7 @@ internal static class InjectorAssetResolver
     internal static (string ToolPath, string PayloadPath) Resolve(InjectionRuntimeKind runtime, string architecture, string baseDirectory)
     {
         var normalizedArchitecture = architecture.Equals("x64", StringComparison.OrdinalIgnoreCase) ? "x64" : "x86";
-        var toolDirectory = Path.Combine(baseDirectory, "Tools", "x64");
+        var toolDirectory = Path.Combine(baseDirectory, "Tools", normalizedArchitecture);
         var payloadDirectory = Path.Combine(baseDirectory, "Tools", normalizedArchitecture);
 
         return (

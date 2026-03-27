@@ -146,11 +146,34 @@ public partial class MainWindowViewModel : ObservableObject
 
     public bool IsFrameworkVersionEnabled => SelectedRuntimeOption?.Kind == InjectionRuntimeKind.DotNetFramework;
 
+    public int FilteredProcessCount => FilteredProcesses.Count;
+
     public string SelectedRuntimeDescription => SelectedRuntimeOption?.Description ?? "未选择运行时";
 
     public string SelectedProcessSummary => SelectedProcess is null
         ? string.IsNullOrWhiteSpace(TargetProcessIdText) ? "未选择进程" : $"手工输入 PID: {TargetProcessIdText}"
         : $"{SelectedProcess.ProcessName} ({SelectedProcess.ProcessId}) / {SelectedProcess.Architecture}";
+
+    public string SelectedProcessPathSummary => SelectedProcess?.ExecutablePathOrFallback ?? "未选择进程路径";
+
+    public string FrameworkVersionSummary => IsFrameworkVersionEnabled
+        ? string.IsNullOrWhiteSpace(FrameworkVersion) ? "未指定" : FrameworkVersion
+        : "不适用";
+
+    public string EntrySignatureSummary
+    {
+        get
+        {
+            var trimmed_entry_class = EntryClass.Trim();
+            var trimmed_entry_method = EntryMethod.Trim();
+            if (string.IsNullOrWhiteSpace(trimmed_entry_class) || string.IsNullOrWhiteSpace(trimmed_entry_method))
+            {
+                return "未填写完整入口签名";
+            }
+
+            return $"{trimmed_entry_class}.{trimmed_entry_method}(string)";
+        }
+    }
 
     public MainWindowViewModel(
         IProcessCatalogService processCatalogService,
@@ -184,8 +207,15 @@ public partial class MainWindowViewModel : ObservableObject
             StatusMessage = "刷新进程中";
             FooterMessage = "正在从系统枚举进程列表。";
 
+            var previously_selected_process_id = SelectedProcess?.ProcessId;
             all_processes_ = (await process_catalog_service_.GetProcessesAsync()).ToList();
             ApplyProcessFilter();
+
+            if (previously_selected_process_id.HasValue)
+            {
+                SelectedProcess = FilteredProcesses.FirstOrDefault(item => item.ProcessId == previously_selected_process_id.Value)
+                    ?? all_processes_.FirstOrDefault(item => item.ProcessId == previously_selected_process_id.Value);
+            }
 
             StatusMessage = "进程列表已更新";
             FooterMessage = $"已加载 {all_processes_.Count} 个进程。";
@@ -319,6 +349,7 @@ public partial class MainWindowViewModel : ObservableObject
 
     private void ApplyProcessFilter()
     {
+        var selected_process_id = SelectedProcess?.ProcessId;
         FilteredProcesses.Clear();
 
         IEnumerable<TargetProcessInfo> query = all_processes_;
@@ -334,6 +365,17 @@ public partial class MainWindowViewModel : ObservableObject
         {
             FilteredProcesses.Add(item);
         }
+
+        if (selected_process_id.HasValue)
+        {
+            var matching_process = FilteredProcesses.FirstOrDefault(item => item.ProcessId == selected_process_id.Value);
+            if (matching_process is not null)
+            {
+                SelectedProcess = matching_process;
+            }
+        }
+
+        OnPropertyChanged(nameof(FilteredProcessCount));
     }
 
     private static IEnumerable<string> GetFrameworkVersions()
@@ -372,6 +414,7 @@ public partial class MainWindowViewModel : ObservableObject
                 }
 
                 OnPropertyChanged(nameof(IsFrameworkVersionEnabled));
+                OnPropertyChanged(nameof(FrameworkVersionSummary));
                 OnPropertyChanged(nameof(SelectedRuntimeDescription));
                 break;
             case nameof(SelectedProcess):
@@ -382,12 +425,20 @@ public partial class MainWindowViewModel : ObservableObject
                 }
 
                 OnPropertyChanged(nameof(SelectedProcessSummary));
+                OnPropertyChanged(nameof(SelectedProcessPathSummary));
                 break;
             case nameof(TargetProcessIdText):
                 OnPropertyChanged(nameof(SelectedProcessSummary));
                 break;
             case nameof(ProcessSearchText):
                 ApplyProcessFilter();
+                break;
+            case nameof(FrameworkVersion):
+                OnPropertyChanged(nameof(FrameworkVersionSummary));
+                break;
+            case nameof(EntryClass):
+            case nameof(EntryMethod):
+                OnPropertyChanged(nameof(EntrySignatureSummary));
                 break;
         }
     }

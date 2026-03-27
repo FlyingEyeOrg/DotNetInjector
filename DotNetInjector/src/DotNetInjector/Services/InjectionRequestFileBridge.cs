@@ -8,22 +8,20 @@ internal sealed class InjectionRequestFileBridge : IDisposable
 {
     private const string k_request_directory_name = "DotNetInjector\\requests";
 
-    private readonly string request_file_path_;
+    private readonly IReadOnlyList<string> request_file_paths_;
     private bool disposed_;
 
-    private InjectionRequestFileBridge(string requestFilePath)
+    private InjectionRequestFileBridge(IReadOnlyList<string> requestFilePaths)
     {
-        request_file_path_ = requestFilePath;
+        request_file_paths_ = requestFilePaths;
     }
 
-    public string RequestFilePath => request_file_path_;
+    public string RequestFilePath => request_file_paths_[0];
 
-    public static InjectionRequestFileBridge Publish(ManagedInjectionRequest request)
+    public IReadOnlyList<string> PublishedRequestFilePaths => request_file_paths_;
+
+    public static InjectionRequestFileBridge Publish(ManagedInjectionRequest request, params string?[] additionalBaseDirectories)
     {
-        var request_file_path = GetRequestFilePath(request.ProcessId);
-        Directory.CreateDirectory(Path.GetDirectoryName(request_file_path)!);
-
-        var temp_file_path = request_file_path + $".{Environment.ProcessId}.{Guid.NewGuid():N}.tmp";
         var lines = new[]
         {
             "format_version=1",
@@ -35,16 +33,49 @@ internal sealed class InjectionRequestFileBridge : IDisposable
             $"entry_argument={EncodeValue(request.EntryArgument)}",
         };
 
-        File.WriteAllLines(temp_file_path, lines, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-        File.Move(temp_file_path, request_file_path, overwrite: true);
+        var request_file_paths = GetRequestFilePaths(request.ProcessId, additionalBaseDirectories);
+        foreach (var request_file_path in request_file_paths)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(request_file_path)!);
 
-        return new InjectionRequestFileBridge(request_file_path);
+            var temp_file_path = request_file_path + $".{Environment.ProcessId}.{Guid.NewGuid():N}.tmp";
+            File.WriteAllLines(temp_file_path, lines, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            File.Move(temp_file_path, request_file_path, overwrite: true);
+        }
+
+        return new InjectionRequestFileBridge(request_file_paths);
     }
 
     internal static string GetRequestFilePath(int processId, string? baseDirectory = null)
     {
         var request_directory = baseDirectory ?? Path.Combine(Path.GetTempPath(), k_request_directory_name);
         return Path.Combine(request_directory, $"request-{processId}.txt");
+    }
+
+    internal static string GetModuleRequestFilePath(string baseDirectory)
+    {
+        return Path.Combine(baseDirectory, "request.txt");
+    }
+
+    internal static IReadOnlyList<string> GetRequestFilePaths(int processId, params string?[] additionalBaseDirectories)
+    {
+        var paths = new List<string>();
+        var seen_paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        AddPath(paths, seen_paths, GetRequestFilePath(processId));
+
+        foreach (var additional_base_directory in additionalBaseDirectories)
+        {
+            if (string.IsNullOrWhiteSpace(additional_base_directory))
+            {
+                continue;
+            }
+
+            AddPath(paths, seen_paths, GetRequestFilePath(processId, additional_base_directory));
+            AddPath(paths, seen_paths, GetModuleRequestFilePath(additional_base_directory));
+        }
+
+        return paths;
     }
 
     public void Dispose()
@@ -56,9 +87,14 @@ internal sealed class InjectionRequestFileBridge : IDisposable
 
         try
         {
-            if (File.Exists(request_file_path_))
+            foreach (var request_file_path in request_file_paths_)
             {
-                File.Delete(request_file_path_);
+                if (!File.Exists(request_file_path))
+                {
+                    continue;
+                }
+
+                File.Delete(request_file_path);
             }
         }
         catch
@@ -83,5 +119,13 @@ internal sealed class InjectionRequestFileBridge : IDisposable
             InjectionRuntimeKind.Mono => "Mono",
             _ => request.FrameworkVersion ?? string.Empty,
         };
+    }
+
+    private static void AddPath(ICollection<string> paths, ISet<string> seenPaths, string path)
+    {
+        if (seenPaths.Add(path))
+        {
+            paths.Add(path);
+        }
     }
 }

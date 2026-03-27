@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Reflection;
+using System.Text;
 
 namespace CoreInjectionClassLibrary
 {
@@ -7,6 +8,8 @@ namespace CoreInjectionClassLibrary
     {
         public static int InjectionMethod(string value)
         {
+            Console.OutputEncoding = Encoding.UTF8;
+
             Console.WriteLine("print value: " + value);
             Console.WriteLine("方法强制调用成功");
 

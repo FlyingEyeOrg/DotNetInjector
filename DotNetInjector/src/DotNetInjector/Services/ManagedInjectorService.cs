@@ -9,6 +9,7 @@ namespace DotNetInjector.Services;
 public sealed class ManagedInjectorService : IManagedInjectorService
 {
     private static readonly TimeSpan k_execution_timeout = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan k_request_file_grace_period = TimeSpan.FromMilliseconds(750);
 
     private readonly ILogger<ManagedInjectorService> logger_;
 
@@ -43,7 +44,9 @@ public sealed class ManagedInjectorService : IManagedInjectorService
             throw new UserFriendlyException($"桥接注入库不存在：{payload_path}");
         }
 
-        using var bridge = InjectionRequestFileBridge.Publish(request);
+        using var bridge = InjectionRequestFileBridge.Publish(
+            request,
+            Path.GetDirectoryName(payload_path));
 
         var stopwatch = Stopwatch.StartNew();
         using var timeout_cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -61,11 +64,11 @@ public sealed class ManagedInjectorService : IManagedInjectorService
         };
 
         logger_.LogInformation(
-            "启动注入器: Tool={ToolPath}, Payload={PayloadPath}, TargetArch={TargetArchitecture}, RequestFile={RequestFilePath}, Args={Arguments}",
+            "启动注入器: Tool={ToolPath}, Payload={PayloadPath}, TargetArch={TargetArchitecture}, RequestFiles={RequestFiles}, Args={Arguments}",
             process_info.FileName,
             payload_path,
             architecture,
-            bridge.RequestFilePath,
+            string.Join(" | ", bridge.PublishedRequestFilePaths),
             process_info.Arguments);
 
         using var injector_process = Process.Start(process_info);
@@ -85,6 +88,11 @@ public sealed class ManagedInjectorService : IManagedInjectorService
         {
             TryKillProcess(injector_process);
             throw new UserFriendlyException("注入器执行超时，目标进程可能无响应或桥接 DLL 未完成初始化。", details: $"Timeout={k_execution_timeout.TotalSeconds}s");
+        }
+
+        if (injector_process.ExitCode == 0)
+        {
+            await Task.Delay(k_request_file_grace_period, cancellationToken);
         }
 
         var standard_output = await output_task;
