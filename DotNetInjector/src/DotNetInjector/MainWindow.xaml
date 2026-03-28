@@ -101,10 +101,9 @@
                                             Content="刷新">
                                     </Button>
                                 </Grid>
-                                <StackPanel Grid.Column="1"
-                                            Margin="20,18,20,12"
-                                            DockPanel.Dock="Top">
+                                <StackPanel>
                                     <TextBlock Style="{StaticResource TextBlockDefault}"
+                                               Margin="0 16 0 0"
                                                Text="筛选进程" />
                                     <TextBox x:Name="ProcessSearchTextBox"
                                              Margin="0,8,0,0"
@@ -127,6 +126,7 @@
                         </Border>
                         <ListBox Grid.Row="1"
                                  Grid.Column="2"
+                                 Margin="20 16 20 16"
                                  x:Name="ProcessListBox"
                                  BorderThickness="0"
                                  ItemsSource="{Binding FilteredProcesses}"
@@ -180,7 +180,6 @@
                             </ListBox.ItemTemplate>
                         </ListBox>
                     </Grid>
-
                 </Grid>
             </hc:Card>
             <Grid Grid.Column="2">
@@ -189,34 +188,19 @@
                     <RowDefinition Height="20" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
-
-                <hc:Card Padding="22"
-                         BorderThickness="0"
+                <hc:Card BorderThickness="0"
                          Effect="{DynamicResource EffectShadow2}">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="24" />
-                            <ColumnDefinition Width="300" />
+                            <ColumnDefinition Width="320" />
                         </Grid.ColumnDefinitions>
-
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-
+                        <StackPanel Margin="20 16 0 0">
                             <TextBlock Text="注入参数"
                                        FontSize="22"
                                        FontWeight="SemiBold" />
-
-                            <Grid Grid.Row="1"
-                                  Margin="0,18,0,0">
+                            <Grid Margin="0,18,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="132" />
                                     <ColumnDefinition Width="*" />
@@ -230,8 +214,7 @@
                                           DisplayMemberPath="DisplayName" />
                             </Grid>
 
-                            <Grid Grid.Row="2"
-                                  Margin="0,16,0,0">
+                            <Grid Margin="0,16,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="132" />
                                     <ColumnDefinition Width="*" />
@@ -247,8 +230,7 @@
                                           hc:InfoElement.Placeholder=".NET Framework 例如 v4.0.30319" />
                             </Grid>
 
-                            <Grid Grid.Row="3"
-                                  Margin="0,16,0,0">
+                            <Grid Margin="0,16,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="132" />
                                     <ColumnDefinition Width="*" />
@@ -262,12 +244,12 @@
                                          Text="{Binding AssemblyPath, UpdateSourceTrigger=PropertyChanged}"
                                          hc:InfoElement.Placeholder="选择或输入要注入的托管 DLL" />
                                 <Button Grid.Column="2"
-                                        Padding="16,8"
+                                        Style="{StaticResource ButtonDefault}"
+                                        hc:IconElement.Geometry="{StaticResource SearchGeometry}"
                                         Command="{Binding BrowseAssemblyCommand}">浏览</Button>
                             </Grid>
 
-                            <Grid Grid.Row="4"
-                                  Margin="0,16,0,0">
+                            <Grid Margin="0,16,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="132" />
                                     <ColumnDefinition Width="*" />
@@ -307,13 +289,18 @@
                                          Text="{Binding EntryMethodArgument, UpdateSourceTrigger=PropertyChanged}"
                                          hc:InfoElement.Placeholder="可留空，写入共享内存后传给注入入口" />
                             </Grid>
-                        </Grid>
 
+                            <Button x:Name="InjectButton"
+                                    Margin="0,28,0,0"
+                                    Height="44"
+                                    Style="{StaticResource ButtonPrimary}"
+                                    Command="{Binding InjectAsyncCommand}">开始注入</Button>
+                        </StackPanel>
                         <hc:Card Grid.Column="2"
                                  Background="#F8FBFC"
                                  BorderBrush="#D7E3E8"
                                  BorderThickness="1">
-                            <StackPanel>
+                            <StackPanel Margin="16 16 16 16">
                                 <TextBlock x:Name="SummaryHeaderTextBlock"
                                            Text="当前摘要"
                                            FontSize="20"
@@ -379,16 +366,11 @@
                                            Foreground="#6B7F89"
                                            Text="类型不能为嵌套类；推荐签名为 public static int Method(string value)。方法栏只需填写方法名。"
                                            TextWrapping="Wrap" />
-                                <Button x:Name="InjectButton"
-                                        Margin="0,28,0,0"
-                                        Height="44"
-                                        Style="{StaticResource ButtonPrimary}"
-                                        Command="{Binding InjectAsyncCommand}">开始注入</Button>
+
                             </StackPanel>
                         </hc:Card>
                     </Grid>
                 </hc:Card>
-
                 <hc:Card Grid.Row="2"
                          Padding="22"
                          BorderThickness="0"
