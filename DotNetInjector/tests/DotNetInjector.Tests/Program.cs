@@ -7,6 +7,7 @@ internal static class Program
         try
         {
             InjectionRequestFileBridgeTests.Run();
+            InjectorCommandLineBuilderTests.Run();
             InjectorAssetResolverTests.Run();
             Console.WriteLine("[PASS] DotNetInjector.Tests");
             return 0;

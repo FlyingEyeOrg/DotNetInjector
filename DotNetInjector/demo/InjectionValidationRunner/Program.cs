@@ -95,7 +95,10 @@ foreach (var target in selected_targets)
         target.assembly_path,
         target.entry_class,
         target.entry_method,
-        target.entry_argument);
+        target.entry_argument,
+        InjectionPayloadKind.LoadLibrary,
+        InjectionExecutionKind.RemoteThread,
+        RemoteThreadBackendKind.Auto);
 
     try
     {

@@ -7,4 +7,7 @@ public sealed record ManagedInjectionRequest(
     string AssemblyPath,
     string EntryClass,
     string EntryMethod,
-    string EntryArgument);
+    string EntryArgument,
+    InjectionPayloadKind PayloadKind,
+    InjectionExecutionKind ExecutionKind,
+    RemoteThreadBackendKind? RemoteThreadBackend);

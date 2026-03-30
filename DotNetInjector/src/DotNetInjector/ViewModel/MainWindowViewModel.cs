@@ -36,6 +36,9 @@ public partial class MainWindowViewModel : ObservableObject
     private bool is_busy_;
     private TargetProcessInfo? selected_process_;
     private InjectionRuntimeOption? selected_runtime_option_;
+    private InjectionPayloadOption? selected_payload_option_;
+    private InjectionExecutionOption? selected_execution_option_;
+    private RemoteThreadBackendOption? selected_remote_thread_backend_option_;
 
     public ObservableCollection<TargetProcessInfo> FilteredProcesses { get; } = new();
 
@@ -52,6 +55,25 @@ public partial class MainWindowViewModel : ObservableObject
         new(InjectionRuntimeKind.DotNetFramework, ".NET Framework", "使用统一的 ManagedInjectionLibrary.dll，并写入目标 Framework 版本。"),
         new(InjectionRuntimeKind.DotNet, ".NET / .NET Core", "使用统一的 ManagedInjectionLibrary.dll，对 .NET Core / .NET 进程注入。"),
         new(InjectionRuntimeKind.Mono, "Mono", "使用统一的 ManagedInjectionLibrary.dll，对 Mono 运行时进程注入。"),
+    ];
+
+    public IReadOnlyList<InjectionPayloadOption> PayloadOptions { get; } =
+    [
+        new(InjectionPayloadKind.LoadLibrary, "LoadLibrary", "经典 LoadLibrary 注入，兼容性最好，保持当前默认行为。"),
+        new(InjectionPayloadKind.ManualMap, "Manual Map", "手动映射 DLL 映像，绕过常规模块加载路径。"),
+    ];
+
+    public IReadOnlyList<InjectionExecutionOption> ExecutionOptions { get; } =
+    [
+        new(InjectionExecutionKind.RemoteThread, "Remote Thread", "通过远程线程执行注入逻辑，支持配置线程创建后端。"),
+        new(InjectionExecutionKind.ThreadContext, "Thread Context", "通过修改线程上下文执行注入逻辑，不使用远程线程后端。"),
+    ];
+
+    public IReadOnlyList<RemoteThreadBackendOption> RemoteThreadBackendOptions { get; } =
+    [
+        new(RemoteThreadBackendKind.Auto, "Auto", "由 WinInjector 自动选择线程创建后端。"),
+        new(RemoteThreadBackendKind.NtCreateThreadEx, "NtCreateThreadEx", "优先使用 NtCreateThreadEx 创建远程线程。"),
+        new(RemoteThreadBackendKind.CreateRemoteThread, "CreateRemoteThread", "显式使用 CreateRemoteThread 创建远程线程。"),
     ];
 
     private List<TargetProcessInfo> all_processes_ = [];
@@ -158,11 +180,39 @@ public partial class MainWindowViewModel : ObservableObject
         set => SetProperty(ref selected_runtime_option_, value);
     }
 
+    public InjectionPayloadOption? SelectedPayloadOption
+    {
+        get => selected_payload_option_;
+        set => SetProperty(ref selected_payload_option_, value);
+    }
+
+    public InjectionExecutionOption? SelectedExecutionOption
+    {
+        get => selected_execution_option_;
+        set => SetProperty(ref selected_execution_option_, value);
+    }
+
+    public RemoteThreadBackendOption? SelectedRemoteThreadBackendOption
+    {
+        get => selected_remote_thread_backend_option_;
+        set => SetProperty(ref selected_remote_thread_backend_option_, value);
+    }
+
     public bool IsFrameworkVersionEnabled => SelectedRuntimeOption?.Kind == InjectionRuntimeKind.DotNetFramework;
+
+    public bool IsRemoteThreadBackendEnabled => SelectedExecutionOption?.Kind == InjectionExecutionKind.RemoteThread;
 
     public int FilteredProcessCount => FilteredProcesses.Count;
 
     public string SelectedRuntimeDescription => SelectedRuntimeOption?.Description ?? "未选择运行时";
+
+    public string SelectedPayloadDescription => SelectedPayloadOption?.Description ?? "未选择载荷方式";
+
+    public string SelectedExecutionDescription => SelectedExecutionOption?.Description ?? "未选择执行方式";
+
+    public string SelectedRemoteThreadBackendSummary => IsRemoteThreadBackendEnabled
+        ? SelectedRemoteThreadBackendOption?.Description ?? "未选择远程线程后端"
+        : "当前执行方式不使用远程线程后端";
 
     public string SelectedProcessSummary => SelectedProcess is null
         ? string.IsNullOrWhiteSpace(TargetProcessIdText) ? "未选择进程" : $"手工输入 PID: {TargetProcessIdText}"
@@ -203,6 +253,9 @@ public partial class MainWindowViewModel : ObservableObject
         InjectAsyncCommand = new AsyncRelayCommand(InjectAsync);
 
         SelectedRuntimeOption = RuntimeOptions[1];
+        SelectedPayloadOption = PayloadOptions[0];
+        SelectedExecutionOption = ExecutionOptions[0];
+        SelectedRemoteThreadBackendOption = RemoteThreadBackendOptions[0];
         PropertyChanged += HandlePropertyChanged;
         LoadFrameworkVersions();
         _ = RefreshProcessesAsync();
@@ -355,7 +408,12 @@ public partial class MainWindowViewModel : ObservableObject
             AssemblyPath.Trim(),
             EntryClass.Trim(),
             normalized_entry_method,
-            EntryMethodArgument);
+            EntryMethodArgument,
+            SelectedPayloadOption?.Kind ?? InjectionPayloadKind.LoadLibrary,
+            SelectedExecutionOption?.Kind ?? InjectionExecutionKind.RemoteThread,
+            (SelectedExecutionOption?.Kind ?? InjectionExecutionKind.RemoteThread) == InjectionExecutionKind.RemoteThread
+                ? SelectedRemoteThreadBackendOption?.Kind ?? RemoteThreadBackendKind.Auto
+                : null);
     }
 
     private static string BuildErrorPanelText(InjectionExecutionResult result)
@@ -496,6 +554,17 @@ public partial class MainWindowViewModel : ObservableObject
                 OnPropertyChanged(nameof(IsFrameworkVersionEnabled));
                 OnPropertyChanged(nameof(FrameworkVersionSummary));
                 OnPropertyChanged(nameof(SelectedRuntimeDescription));
+                break;
+            case nameof(SelectedPayloadOption):
+                OnPropertyChanged(nameof(SelectedPayloadDescription));
+                break;
+            case nameof(SelectedExecutionOption):
+                OnPropertyChanged(nameof(IsRemoteThreadBackendEnabled));
+                OnPropertyChanged(nameof(SelectedExecutionDescription));
+                OnPropertyChanged(nameof(SelectedRemoteThreadBackendSummary));
+                break;
+            case nameof(SelectedRemoteThreadBackendOption):
+                OnPropertyChanged(nameof(SelectedRemoteThreadBackendSummary));
                 break;
             case nameof(SelectedProcess):
                 if (SelectedProcess is not null)

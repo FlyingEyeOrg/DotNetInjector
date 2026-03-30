@@ -60,7 +60,7 @@ public sealed class ManagedInjectorService : IManagedInjectorService
         var process_info = new ProcessStartInfo
         {
             FileName = tool_path,
-            Arguments = $"{request.ProcessId} \"{payload_path}\" --payload=load-library --execution=remote-thread",
+            Arguments = InjectorCommandLineBuilder.BuildArguments(request, payload_path),
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,

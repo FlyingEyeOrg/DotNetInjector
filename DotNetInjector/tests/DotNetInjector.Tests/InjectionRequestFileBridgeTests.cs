@@ -65,7 +65,10 @@ internal static class InjectionRequestFileBridgeTests
             @"E:\payloads\Sample.dll",
             "Demo.Entry",
             "Run",
-            "arg-value");
+            "arg-value",
+            InjectionPayloadKind.LoadLibrary,
+            InjectionExecutionKind.RemoteThread,
+            RemoteThreadBackendKind.Auto);
     }
 
     private static void AssertRequestFileContents(string requestFilePath, ManagedInjectionRequest request)

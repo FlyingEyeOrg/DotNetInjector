@@ -211,6 +211,49 @@
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock VerticalAlignment="Center"
+                                               Text="载荷方式" />
+                                    <ComboBox Grid.Column="1"
+                                              Style="{StaticResource ComboBoxExtend}"
+                                              ItemsSource="{Binding PayloadOptions}"
+                                              SelectedItem="{Binding SelectedPayloadOption}"
+                                              DisplayMemberPath="DisplayName" />
+                                </Grid>
+
+                                <Grid Margin="0,16,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="132" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock VerticalAlignment="Center"
+                                               Text="执行方式" />
+                                    <ComboBox Grid.Column="1"
+                                              Style="{StaticResource ComboBoxExtend}"
+                                              ItemsSource="{Binding ExecutionOptions}"
+                                              SelectedItem="{Binding SelectedExecutionOption}"
+                                              DisplayMemberPath="DisplayName" />
+                                </Grid>
+
+                                <Grid Margin="0,16,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="132" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock VerticalAlignment="Center"
+                                               Text="线程后端" />
+                                    <ComboBox Grid.Column="1"
+                                              Style="{StaticResource ComboBoxExtend}"
+                                              ItemsSource="{Binding RemoteThreadBackendOptions}"
+                                              SelectedItem="{Binding SelectedRemoteThreadBackendOption}"
+                                              DisplayMemberPath="DisplayName"
+                                              IsEnabled="{Binding IsRemoteThreadBackendEnabled}" />
+                                </Grid>
+
+                                <Grid Margin="0,16,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="132" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock VerticalAlignment="Center"
                                                Text="Framework 版本" />
                                     <ComboBox Grid.Column="1"
                                               IsEditable="True"
@@ -306,6 +349,27 @@
                                                    Margin="0,6,0,0"
                                                    FontWeight="SemiBold"
                                                    Text="{Binding SelectedRuntimeDescription}"
+                                                   TextWrapping="Wrap" />
+                                        <TextBlock Margin="0,18,0,0"
+                                                   Foreground="#516B77"
+                                                   Text="载荷方式" />
+                                        <TextBlock Margin="0,6,0,0"
+                                                   FontWeight="SemiBold"
+                                                   Text="{Binding SelectedPayloadDescription}"
+                                                   TextWrapping="Wrap" />
+                                        <TextBlock Margin="0,18,0,0"
+                                                   Foreground="#516B77"
+                                                   Text="执行方式" />
+                                        <TextBlock Margin="0,6,0,0"
+                                                   FontWeight="SemiBold"
+                                                   Text="{Binding SelectedExecutionDescription}"
+                                                   TextWrapping="Wrap" />
+                                        <TextBlock Margin="0,18,0,0"
+                                                   Foreground="#516B77"
+                                                   Text="远程线程后端" />
+                                        <TextBlock Margin="0,6,0,0"
+                                                   FontWeight="SemiBold"
+                                                   Text="{Binding SelectedRemoteThreadBackendSummary}"
                                                    TextWrapping="Wrap" />
                                         <TextBlock Margin="0,18,0,0"
                                                    Foreground="#516B77"
