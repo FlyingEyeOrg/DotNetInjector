@@ -12,39 +12,46 @@
         Width="1420"
         WindowStartupLocation="CenterScreen"
         d:DataContext="{d:DesignInstance vm:MainWindowViewModel}">
-    <hc:ScrollViewer>
-        <StackPanel Background="#F4F6F8">
-            <Border Background="#103A4C"
-                    Padding="28,22">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel>
-                        <TextBlock Text="DotNetInjector"
-                                   Foreground="White"
-                                   FontSize="28"
-                                   FontWeight="SemiBold" />
-                        <TextBlock Margin="0,8,0,0"
-                                   Foreground="#C6D9E0"
-                                   Text="面向 .NET Framework / .NET / Mono 的托管程序集注入工作台" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="1"
-                                HorizontalAlignment="Right"
-                                VerticalAlignment="Center">
-                        <TextBlock HorizontalAlignment="Right"
-                                   Foreground="#C6D9E0"
-                                   Text="当前状态" />
-                        <TextBlock HorizontalAlignment="Right"
-                                   Margin="0,6,0,0"
-                                   Foreground="White"
-                                   FontWeight="SemiBold"
-                                   Text="{Binding StatusMessage}" />
-                    </StackPanel>
-                </Grid>
-            </Border>
+    <Grid  Background="#F4F6F8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
+        <Border Background="#103A4C"
+                Padding="28,22"
+                Grid.Row="0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="DotNetInjector"
+                               Foreground="White"
+                               FontSize="28"
+                               FontWeight="SemiBold" />
+                    <TextBlock Margin="0,8,0,0"
+                               Foreground="#C6D9E0"
+                               Text="面向 .NET Framework / .NET / Mono 的托管程序集注入工作台" />
+                </StackPanel>
+                <StackPanel Grid.Column="1"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center">
+                    <TextBlock HorizontalAlignment="Right"
+                               Foreground="#C6D9E0"
+                               Text="当前状态" />
+                    <TextBlock HorizontalAlignment="Right"
+                               Margin="0,6,0,0"
+                               Foreground="White"
+                               FontWeight="SemiBold"
+                               Text="{Binding StatusMessage}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <ScrollViewer  Grid.Row="1">
             <Grid Margin="24"
                   Height="780">
                 <Grid.ColumnDefinitions>
@@ -491,26 +498,27 @@
                     </hc:Card>
                 </Grid>
             </Grid>
+        </ScrollViewer>
 
-            <Border Margin="24,0,24,24"
-                    Padding="18,14"
-                    Background="White"
-                    CornerRadius="12">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock x:Name="FooterMessageTextBlock"
-                               VerticalAlignment="Center"
-                               Text="{Binding FooterMessage}" />
-                    <TextBlock x:Name="LastExecutionMetaTextBlock"
-                               Grid.Column="1"
-                               VerticalAlignment="Center"
-                               Foreground="#6B7F89"
-                               Text="{Binding LastExecutionMeta}" />
-                </Grid>
-            </Border>
-        </StackPanel>
-    </hc:ScrollViewer>
+        <Border Margin="24,24,24,24"
+                Padding="18,14"
+                Background="White"
+                CornerRadius="12"
+                Grid.Row="2">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="FooterMessageTextBlock"
+                           VerticalAlignment="Center"
+                           Text="{Binding FooterMessage}" />
+                <TextBlock x:Name="LastExecutionMetaTextBlock"
+                           Grid.Column="1"
+                           VerticalAlignment="Center"
+                           Foreground="#6B7F89"
+                           Text="{Binding LastExecutionMeta}" />
+            </Grid>
+        </Border>
+    </Grid>
 </Window>
